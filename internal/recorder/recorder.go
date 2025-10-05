@@ -91,23 +91,25 @@ func (r *Recorder) Start() error {
 			"-loglevel", "warning",
 			"-y",
 
-			// use filter_complex instead of -f/-i
+			// Capture video from a specific window (case-insensitive exact match)
 			"-filter_complex", fmt.Sprintf(
 				"gfxcapture=window_title='(?i)^%s$':max_framerate=30,hwdownload,format=bgra,scale=1280:720,format=yuv420p",
 				r.Title,
 			),
 
-			// encoding
-			"-b:v", "650k",
-			"-b:a", "90k",
+			// Disable audio completely
+			"-an",
+
+			// Encoding
 			"-c:v", "libx264",
 			"-preset", "veryfast",
 			"-crf", "30",
+			"-b:v", "700k",
 			"-g", "60",
 
-			// output format
+			// Output format (HLS)
 			"-f", "hls",
-			"-hls_time", "40",
+			"-hls_time", "200",
 			"-hls_list_size", "0",
 			"-hls_segment_filename", r.segmentPattern,
 
