@@ -108,7 +108,7 @@ func parseFlags() *cliConfig {
 
 	flag.StringVar(&cfg.Title, "title", "", "Window title to record (exact match)")
 	flag.StringVar(&cfg.OutPath, "out", "", "Output directory for HLS segments and logs")
-	flag.StringVar(&cfg.Endpoint, "endpoint", "", "Upload endpoint base URL (e.g., https://server/upload)")
+	flag.StringVar(&cfg.Endpoint, "endpoint", "https://www.polytube.io/api/sign", "Upload endpoint URL")
 	flag.StringVar(&cfg.ApiID, "api-id", "", "API ID header value")
 	flag.StringVar(&cfg.ApiKey, "api-key", "", "API Key header value")
 	flag.StringVar(&cfg.SessionID, "session-id", uuid.New().String(), "Session id.")

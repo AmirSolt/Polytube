@@ -120,54 +120,90 @@ func (u *Uploader) UploadLogFile() {
 	go u.uploadFile(path)
 }
 
-// uploadFile sends the file via HTTP PUT to EndpointURL/<fileName>.
+// uploadFile coordinates getting the signed URL and uploading the file.
 func (u *Uploader) uploadFile(path string) {
 	defer u.WG.Done()
 
 	fileName := filepath.Base(path)
-	url := fmt.Sprintf("%s/%s/%s/%s",
+
+	signedURL, err := u.getSignedURL(fileName)
+	if err != nil {
+		u.Logger.Error(fmt.Sprintf("uploader: failed to get signed URL for %s: %v", fileName, err))
+		return
+	}
+
+	if err := u.putFileToSignedURL(signedURL, path); err != nil {
+		u.Logger.Error(fmt.Sprintf("uploader: failed to upload %s: %v", fileName, err))
+		return
+	}
+
+	u.markUploaded(path)
+}
+
+// getSignedURL sends a GET request to retrieve a signed URL for uploading the given file.
+func (u *Uploader) getSignedURL(fileName string) (string, error) {
+	url := fmt.Sprintf("%s/%s/%s/%s/%s",
 		strings.TrimSuffix(u.EndpointURL, "/"),
 		u.ApiID,     // maps to params.user_id
 		u.SessionID, // maps to params.session_id
 		fileName,    // maps to params.file_name
+		"put",
 	)
 
-	u.Logger.Info(fmt.Sprintf("uploader: uploading %s -> %s", fileName, url))
+	u.Logger.Info(fmt.Sprintf("uploader: requesting signed URL for %s -> %s", fileName, url))
 
+	req, err := http.NewRequest(http.MethodGet, url, nil)
+	if err != nil {
+		return "", fmt.Errorf("create GET request: %w", err)
+	}
+	req.Header.Set("Api-Key", u.ApiKey)
+
+	client := u.client()
+	resp, err := client.Do(req)
+	if err != nil {
+		return "", fmt.Errorf("GET request failed: %w", err)
+	}
+	defer resp.Body.Close()
+
+	body, _ := io.ReadAll(resp.Body)
+	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		return "", fmt.Errorf("server returned %d: %s", resp.StatusCode, string(body))
+	}
+
+	signedURL := strings.TrimSpace(string(body))
+	u.Logger.Info(fmt.Sprintf("uploader: received signed URL for %s: %s", fileName, signedURL))
+	return signedURL, nil
+}
+
+// putFileToSignedURL uploads the file to the signed URL via HTTP PUT.
+func (u *Uploader) putFileToSignedURL(signedURL string, path string) error {
+	fileName := filepath.Base(path)
 	file, err := os.Open(path)
 	if err != nil {
-		u.Logger.Warn(fmt.Sprintf("uploader: open %s failed: %v", path, err))
-		return
+		return fmt.Errorf("open file: %w", err)
 	}
 	defer file.Close()
 
-	req, err := http.NewRequest(http.MethodPut, url, file)
+	req, err := http.NewRequest(http.MethodPut, signedURL, file)
 	if err != nil {
-		u.Logger.Warn(fmt.Sprintf("uploader: request %s failed: %v", fileName, err))
-		return
+		return fmt.Errorf("create PUT request: %w", err)
 	}
-
-	// ✅ Set correct headers expected by the server
-	req.Header.Set("secret-key", u.ApiKey) // matches server
 	req.Header.Set("Content-Type", "application/octet-stream")
 
 	client := u.client()
 	resp, err := client.Do(req)
 	if err != nil {
-		u.Logger.Warn(fmt.Sprintf("uploader: http error for %s: %v", fileName, err))
-		return
+		return fmt.Errorf("PUT request failed: %w", err)
 	}
 	defer resp.Body.Close()
 
 	body, _ := io.ReadAll(resp.Body)
-
-	if resp.StatusCode >= 200 && resp.StatusCode < 300 {
-		u.markUploaded(path)
-		u.Logger.Info(fmt.Sprintf("uploader: %s uploaded successfully! (status %d)", fileName, resp.StatusCode))
-	} else {
-		u.Logger.Error(fmt.Sprintf("uploader: upload failed: %s (status %d, response: %s)",
-			fileName, resp.StatusCode, string(body)))
+	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		return fmt.Errorf("upload failed (status %d): %s", resp.StatusCode, string(body))
 	}
+
+	u.Logger.Info(fmt.Sprintf("uploader: %s uploaded successfully! (status %d)", fileName, resp.StatusCode))
+	return nil
 }
 
 // --- helpers ---
@@ -201,3 +237,55 @@ func isStable(path string) bool {
 	age := time.Since(info.ModTime())
 	return age > 2*time.Second
 }
+
+// ===================================================
+
+// uploadFile sends the file via HTTP PUT to EndpointURL/<fileName>.
+// func (u *Uploader) uploadFileDeprecated(path string) {
+// 	defer u.WG.Done()
+
+// 	fileName := filepath.Base(path)
+// 	url := fmt.Sprintf("%s/%s/%s/%s",
+// 		strings.TrimSuffix(u.EndpointURL, "/"),
+// 		u.ApiID,     // maps to params.user_id
+// 		u.SessionID, // maps to params.session_id
+// 		fileName,    // maps to params.file_name
+// 	)
+
+// 	u.Logger.Info(fmt.Sprintf("uploader: uploading %s -> %s", fileName, url))
+
+// 	file, err := os.Open(path)
+// 	if err != nil {
+// 		u.Logger.Warn(fmt.Sprintf("uploader: open %s failed: %v", path, err))
+// 		return
+// 	}
+// 	defer file.Close()
+
+// 	req, err := http.NewRequest(http.MethodPut, url, file)
+// 	if err != nil {
+// 		u.Logger.Warn(fmt.Sprintf("uploader: request %s failed: %v", fileName, err))
+// 		return
+// 	}
+
+// 	// ✅ Set correct headers expected by the server
+// 	req.Header.Set("secret-key", u.ApiKey) // matches server
+// 	req.Header.Set("Content-Type", "application/octet-stream")
+
+// 	client := u.client()
+// 	resp, err := client.Do(req)
+// 	if err != nil {
+// 		u.Logger.Warn(fmt.Sprintf("uploader: http error for %s: %v", fileName, err))
+// 		return
+// 	}
+// 	defer resp.Body.Close()
+
+// 	body, _ := io.ReadAll(resp.Body)
+
+// 	if resp.StatusCode >= 200 && resp.StatusCode < 300 {
+// 		u.markUploaded(path)
+// 		u.Logger.Info(fmt.Sprintf("uploader: %s uploaded successfully! (status %d)", fileName, resp.StatusCode))
+// 	} else {
+// 		u.Logger.Error(fmt.Sprintf("uploader: upload failed: %s (status %d, response: %s)",
+// 			fileName, resp.StatusCode, string(body)))
+// 	}
+// }

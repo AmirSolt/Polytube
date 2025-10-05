@@ -15,12 +15,24 @@ var ffmpegBytes embed.FS
 // ExtractFFmpeg extracts the embedded ffmpeg.exe into a temp directory
 // and returns the absolute path to the extracted file.
 func ExtractFFmpeg() (string, error) {
-	tempDir, err := os.MkdirTemp("", "replay_ffmpeg")
-	if err != nil {
-		return "", fmt.Errorf("create temp dir: %w", err)
-	}
-	outPath := filepath.Join(tempDir, "ffmpeg.exe")
+	// Use a fixed folder under the system temp dir
+	baseTemp := os.TempDir() // e.g. C:\Users\<User>\AppData\Local\Temp
+	fixedDir := filepath.Join(baseTemp, "___replay_ffmpeg_____")
 
+	// Ensure directory exists
+	if err := os.MkdirAll(fixedDir, 0o755); err != nil {
+		return "", fmt.Errorf("create fixed dir: %w", err)
+	}
+
+	outPath := filepath.Join(fixedDir, "ffmpeg.exe")
+
+	// Check if it already exists
+	if _, err := os.Stat(outPath); err == nil {
+		// File already exists — reuse
+		return outPath, nil
+	}
+
+	// Otherwise, extract from embedded bytes
 	data, err := ffmpegBytes.ReadFile("assets/ffmpeg/ffmpeg.exe")
 	if err != nil {
 		return "", fmt.Errorf("read embedded ffmpeg: %w", err)

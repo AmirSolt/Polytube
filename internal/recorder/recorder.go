@@ -93,7 +93,7 @@ func (r *Recorder) Start() error {
 
 			// use filter_complex instead of -f/-i
 			"-filter_complex", fmt.Sprintf(
-				"gfxcapture=window_title='(?i)%s':max_framerate=30,hwdownload,format=bgra,scale=1280:720,format=yuv420p",
+				"gfxcapture=window_title='(?i)^%s$':max_framerate=30,hwdownload,format=bgra,scale=1280:720,format=yuv420p",
 				r.Title,
 			),
 
