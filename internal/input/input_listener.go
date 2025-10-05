@@ -5,39 +5,23 @@ package input
 import (
 	"context"
 	"fmt"
+	"math"
+	"runtime"
 	"time"
 
-	"github.com/0xcafed00d/joystick"
-	"github.com/moutend/go-hook/pkg/keyboard"
-	"github.com/moutend/go-hook/pkg/mouse"
-	"github.com/moutend/go-hook/pkg/types"
+	"github.com/go-gl/glfw/v3.3/glfw"
 
 	"polytube/replay/internal/events"
 	"polytube/replay/internal/logger"
 	"polytube/replay/pkg/models"
 )
 
-// Define missing mouse messages manually (from Win32 API)
-const (
-	WM_LBUTTONDOWN types.Message = 0x0201
-	WM_LBUTTONUP   types.Message = 0x0202
-	WM_RBUTTONDOWN types.Message = 0x0204
-	WM_RBUTTONUP   types.Message = 0x0205
-	WM_MBUTTONDOWN types.Message = 0x0207
-	WM_MBUTTONUP   types.Message = 0x0208
-)
+// --- InputListener ---
 
-const (
-	pollInterval = 100 * time.Millisecond
-	maxJoysticks = 16
-)
-
-// InputListener listens to keyboard, mouse, and joystick events.
 type InputListener struct {
 	EventLogger *events.EventLogger
 	Logger      *logger.Logger
-
-	lastStates map[string]float64 // map[device+button]value
+	lastStates  map[string]float64
 }
 
 // Start begins listening for all input devices until context is canceled.
@@ -45,160 +29,228 @@ func (l *InputListener) Start(ctx context.Context) {
 	if l.EventLogger == nil || l.Logger == nil {
 		return
 	}
-	l.Logger.Info("input listener: starting keyboard, mouse, and joystick listeners")
+	l.Logger.Info("input listener: starting GLFW + XInput listeners")
 	l.lastStates = make(map[string]float64)
 
-	// --- Keyboard listener ---
-	go l.listenKeyboard(ctx)
+	// GLFW must run on main OS thread
+	runtime.LockOSThread()
 
-	// --- Mouse listener ---
-	go l.listenMouse(ctx)
-
-	// --- Joysticks listener ---
-	l.listenJoysticks(ctx)
-}
-
-func (l *InputListener) listenKeyboard(ctx context.Context) {
-	keyboardChan := make(chan types.KeyboardEvent, 100)
-	if err := keyboard.Install(nil, keyboardChan); err != nil {
-		l.Logger.Warn(fmt.Sprintf("keyboard hook install failed: %v", err))
+	if err := glfw.Init(); err != nil {
+		l.Logger.Warn(fmt.Sprintf("GLFW init failed: %v", err))
 		return
 	}
-	defer keyboard.Uninstall()
+	defer glfw.Terminate()
 
-	for {
-		select {
-		case <-ctx.Done():
-			return
-		case ev := <-keyboardChan:
-			switch ev.Message {
-			case types.WM_KEYDOWN:
-				l.logEvent(models.EventLevelKeyboard, vkToString(ev.VKCode), 1)
-			case types.WM_KEYUP:
-				l.logEvent(models.EventLevelKeyboard, vkToString(ev.VKCode), 0)
+	// --- Detect joysticks ---
+	for jid := glfw.Joystick1; jid <= glfw.Joystick16; jid++ {
+		if jid.Present() {
+			name := jid.GetName()
+			axes := jid.GetAxes()
+			buttons := jid.GetButtons()
+			isGamepad := jid.IsGamepad()
+			l.Logger.Info(fmt.Sprintf("Joystick %d detected: %s | IsGamepad=%v | Axes=%d | Buttons=%d",
+				jid, name, isGamepad, len(axes), len(buttons)))
+
+			if len(axes) == 0 && len(buttons) == 0 {
+				l.Logger.Warn(fmt.Sprintf("Joystick %d (%s): no axes/buttons detected — GLFW cannot read input", jid, name))
 			}
 		}
 	}
-}
 
-func (l *InputListener) listenMouse(ctx context.Context) {
-	mouseChan := make(chan types.MouseEvent, 100)
-	if err := mouse.Install(nil, mouseChan); err != nil {
-		l.Logger.Warn(fmt.Sprintf("mouse hook install failed: %v", err))
+	// Create hidden window for keyboard/mouse input
+	glfw.WindowHint(glfw.Visible, glfw.False)
+	window, err := glfw.CreateWindow(640, 480, "Input Listener", nil, nil)
+	if err != nil {
+		l.Logger.Warn(fmt.Sprintf("GLFW window creation failed: %v", err))
 		return
 	}
-	defer mouse.Uninstall()
+	window.MakeContextCurrent()
 
-	for {
-		select {
-		case <-ctx.Done():
-			return
-		case ev := <-mouseChan:
-			switch ev.Message {
-			case WM_LBUTTONDOWN:
-				l.logEvent(models.EventLevelMouse, "LeftButton", 1)
-			case WM_LBUTTONUP:
-				l.logEvent(models.EventLevelMouse, "LeftButton", 0)
-			case WM_RBUTTONDOWN:
-				l.logEvent(models.EventLevelMouse, "RightButton", 1)
-			case WM_RBUTTONUP:
-				l.logEvent(models.EventLevelMouse, "RightButton", 0)
-			case WM_MBUTTONDOWN:
-				l.logEvent(models.EventLevelMouse, "MiddleButton", 1)
-			case WM_MBUTTONUP:
-				l.logEvent(models.EventLevelMouse, "MiddleButton", 0)
-			}
-		}
-	}
-}
+	window.SetKeyCallback(l.onKey)
+	window.SetMouseButtonCallback(l.onMouseButton)
 
-func (l *InputListener) listenJoysticks(ctx context.Context) {
-	type jsDev struct {
-		id          int
-		js          joystick.Joystick
-		prevButtons uint32
-		btnCount    int
-	}
-	var joysticks []jsDev
-	for id := 0; id < maxJoysticks; id++ {
-		if js, err := joystick.Open(id); err == nil {
-			joysticks = append(joysticks, jsDev{
-				id:       id,
-				js:       js,
-				btnCount: js.ButtonCount(),
-			})
-			l.Logger.Info(fmt.Sprintf("joystick %d connected: %s", id, js.Name()))
-		}
-	}
+	l.Logger.Info("GLFW input callbacks installed")
 
-	ticker := time.NewTicker(pollInterval)
+	ticker := time.NewTicker(100 * time.Millisecond)
 	defer ticker.Stop()
 
 	for {
 		select {
 		case <-ctx.Done():
-			l.Logger.Info("input listener: stopping joystick listeners")
-			for _, d := range joysticks {
-				d.js.Close()
-			}
+			l.Logger.Info("input listener: stopping listeners")
+			window.Destroy()
 			return
 
 		case <-ticker.C:
-			for i := range joysticks {
-				state, err := joysticks[i].js.Read()
-				if err != nil {
-					continue
-				}
-				prev := joysticks[i].prevButtons
-				curr := state.Buttons
-				pressed := curr &^ prev
-				released := prev &^ curr
-				if pressed != 0 || released != 0 {
-					for b := 0; b < joysticks[i].btnCount && b < 32; b++ {
-						mask := uint32(1) << uint(b)
-						name := fmt.Sprintf("Button%d", b)
-						if pressed&mask != 0 {
-							l.logEvent(models.EventLevelJoypad, name, 1)
-						}
-						if released&mask != 0 {
-							l.logEvent(models.EventLevelJoypad, name, 0)
-						}
-					}
-					joysticks[i].prevButtons = curr
-				}
-			}
+			glfw.PollEvents()
+			l.pollGLFWJoysticks()
+			l.pollXInputControllers()
 		}
 	}
 }
 
-func (l *InputListener) logEvent(level models.EventLevel, button string, value float64) {
-	if button == "" {
+// --- Keyboard callback ---
+func (l *InputListener) onKey(w *glfw.Window, key glfw.Key, scancode int, action glfw.Action, mods glfw.ModifierKey) {
+	keyName := fmt.Sprintf("Key_%d", key)
+	if action == glfw.Press {
+		l.logEvent(models.EventLevelKeyboard, keyName, 1)
+	} else if action == glfw.Release {
+		l.logEvent(models.EventLevelKeyboard, keyName, 0)
+	}
+}
+
+// --- Mouse callback ---
+func (l *InputListener) onMouseButton(w *glfw.Window, button glfw.MouseButton, action glfw.Action, mods glfw.ModifierKey) {
+	btnName := fmt.Sprintf("MouseButton_%d", button)
+	if action == glfw.Press {
+		l.logEvent(models.EventLevelMouse, btnName, 1)
+	} else if action == glfw.Release {
+		l.logEvent(models.EventLevelMouse, btnName, 0)
+	}
+}
+
+// --- Poll GLFW joysticks (if supported) ---
+func (l *InputListener) pollGLFWJoysticks() {
+	for jid := glfw.Joystick1; jid <= glfw.Joystick16; jid++ {
+		if !jid.Present() || !jid.IsGamepad() {
+			continue
+		}
+
+		state := jid.GetGamepadState()
+		if state == nil {
+			continue
+		}
+
+		name := jid.GetGamepadName()
+		if name == "" {
+			name = fmt.Sprintf("Joystick_%d", jid)
+		}
+
+		for i, pressed := range state.Buttons {
+			val := 0.0
+			if pressed == glfw.Press {
+				val = 1.0
+			}
+			key := fmt.Sprintf("%s_Button_%s", name, gamepadButtonName(i))
+			l.logEvent(models.EventLevelJoypad, key, val)
+		}
+		for i, axis := range state.Axes {
+			key := fmt.Sprintf("%s_Axis_%s", name, gamepadAxisName(i))
+			l.logEvent(models.EventLevelJoypad, key, float64(axis))
+		}
+	}
+}
+
+// --- Poll Xbox controllers via XInput ---
+func (l *InputListener) pollXInputControllers() {
+	for i := uint32(0); i < 4; i++ {
+		state, err := XInputGetState(i)
+		if err != nil {
+			continue // not connected
+		}
+
+		name := fmt.Sprintf("XInput_%d", i)
+		g := state.Gamepad
+
+		buttons := []struct {
+			name string
+			mask uint16
+		}{
+			{"DPad_Up", 0x0001},
+			{"DPad_Down", 0x0002},
+			{"DPad_Left", 0x0004},
+			{"DPad_Right", 0x0008},
+			{"Start", 0x0010},
+			{"Back", 0x0020},
+			{"LThumb", 0x0040},
+			{"RThumb", 0x0080},
+			{"LB", 0x0100},
+			{"RB", 0x0200},
+			{"A", 0x1000},
+			{"B", 0x2000},
+			{"X", 0x4000},
+			{"Y", 0x8000},
+		}
+		for _, b := range buttons {
+			val := 0.0
+			if g.Buttons&b.mask != 0 {
+				val = 1.0
+			}
+			key := fmt.Sprintf("%s_Button_%s", name, b.name)
+			l.logEvent(models.EventLevelJoypad, key, val)
+		}
+
+		// Analog axes
+		l.logEvent(models.EventLevelJoypad, name+"_Axis_LeftX", float64(g.ThumbLX)/32767.0)
+		l.logEvent(models.EventLevelJoypad, name+"_Axis_LeftY", float64(g.ThumbLY)/32767.0)
+		l.logEvent(models.EventLevelJoypad, name+"_Axis_RightX", float64(g.ThumbRX)/32767.0)
+		l.logEvent(models.EventLevelJoypad, name+"_Axis_RightY", float64(g.ThumbRY)/32767.0)
+		l.logEvent(models.EventLevelJoypad, name+"_Axis_LT", float64(g.LeftTrigger)/255.0)
+		l.logEvent(models.EventLevelJoypad, name+"_Axis_RT", float64(g.RightTrigger)/255.0)
+	}
+}
+
+// --- Deduplicated logging ---
+func (l *InputListener) logEvent(level models.EventLevel, key string, value float64) {
+	if key == "" {
 		return
 	}
-	key := level.String() + ":" + button
-	if prev, ok := l.lastStates[key]; ok && prev == value {
-		return // prevent spam if no state change
+	id := level.String() + ":" + key
+	prev, ok := l.lastStates[id]
+
+	// Apply thresholds:
+	if ok {
+		// Analog threshold: skip if change < 0.05
+		if level == models.EventLevelJoypad && isAnalogKey(key) {
+			if math.Abs(prev-value) < 0.05 {
+				return
+			}
+		} else if prev == value {
+			// For buttons or non-analogs, require exact change
+			return
+		}
 	}
-	l.lastStates[key] = value
+
+	l.lastStates[id] = value
 
 	event := models.Event{
-		Timestamp:  time.Now().UTC(),
+		Timestamp:  models.EpochTime(time.Now().UTC()),
 		EventType:  models.EventTypeInputLog.String(),
 		EventLevel: level.String(),
-		Content:    button,
-		Value:      value, // 1 = pressed, 0 = released
+		Content:    key,
+		Value:      value,
 	}
 	if err := l.EventLogger.LogEvent(event); err != nil {
 		l.Logger.Warn(fmt.Sprintf("input listener: failed to log event: %v", err))
 	}
 }
 
-func vkToString(vk types.VKCode) string {
-	if vk >= types.VK_A && vk <= types.VK_Z {
-		return string(rune(vk - types.VK_A + 'A'))
+// --- Human-readable mappings ---
+func gamepadButtonName(index int) string {
+	names := []string{
+		"A", "B", "X", "Y",
+		"LB", "RB", "Back", "Start",
+		"Guide", "LThumb", "RThumb",
+		"DPad_Up", "DPad_Right", "DPad_Down", "DPad_Left",
 	}
-	if vk >= types.VK_0 && vk <= types.VK_9 {
-		return string(rune(vk - types.VK_0 + '0'))
+	if index >= 0 && index < len(names) {
+		return names[index]
 	}
-	return fmt.Sprintf("VK_%d", vk)
+	return fmt.Sprintf("Unknown_%d", index)
+}
+
+func gamepadAxisName(index int) string {
+	names := []string{
+		"LeftX", "LeftY", "RightX", "RightY", "LT", "RT",
+	}
+	if index >= 0 && index < len(names) {
+		return names[index]
+	}
+	return fmt.Sprintf("Unknown_%d", index)
+}
+
+func isAnalogKey(key string) bool {
+	return key == "LeftX" || key == "LeftY" ||
+		key == "RightX" || key == "RightY" ||
+		key == "LT" || key == "RT"
 }

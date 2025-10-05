@@ -58,13 +58,17 @@ func (l *Logger) write(level, msg string) {
 	l.Mu.Lock()
 	defer l.Mu.Unlock()
 
+	now := time.Now().UTC()
+	// Convert to float seconds with milliseconds precision
+	epochSeconds := float64(now.UnixNano()) / 1e9
+	timestamp := fmt.Sprintf("%.3f", epochSeconds)
+
 	if l.closed {
 		// fallback if closed: print to stderr
-		fmt.Fprintf(os.Stderr, "[%s] [%s] %s\n", time.Now().UTC().Format(time.RFC3339), level, msg)
+		fmt.Fprintf(os.Stderr, "[%s] [%s] %s\n", timestamp, level, msg)
 		return
 	}
 
-	timestamp := time.Now().UTC().Format(time.RFC3339)
 	line := fmt.Sprintf("[%s] [%s] %s\n", timestamp, level, msg)
 
 	if _, err := l.Writer.WriteString(line); err != nil {

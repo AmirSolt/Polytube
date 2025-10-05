@@ -64,7 +64,7 @@ func (c *ConsoleListener) Start(ctx context.Context) {
 			}
 
 			event := models.Event{
-				Timestamp:  time.Now().UTC(),
+				Timestamp:  models.EpochTime(time.Now().UTC()),
 				EventType:  models.EventTypeConsoleLog.String(),
 				EventLevel: models.EventLevelLog.String(),
 				Content:    line,

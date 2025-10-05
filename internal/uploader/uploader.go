@@ -48,11 +48,17 @@ type Uploader struct {
 // It skips files still being written by checking last-modified timestamps
 // (simple heuristic: older than ~2s).
 func (u *Uploader) UploadTS() {
+
 	if u.DirPath == "" {
 		u.Logger.Warn("uploader: no DirPath configured")
 		return
 	}
 	u.Logger.Info("uploader: scanning for .ts files")
+
+	if u.ApiID == "" || u.ApiKey == "" {
+		u.Logger.Error(fmt.Sprintf("Failed to upload: Api-ID or Api-Key are empty! Api-ID: %s, Api-Key: %s", u.ApiID, u.ApiKey))
+		return
+	}
 	filepath.WalkDir(u.DirPath, func(path string, d os.DirEntry, err error) error {
 		if err != nil {
 			u.Logger.Warn(fmt.Sprintf("uploader: walk error: %v", err))
@@ -81,7 +87,12 @@ func (u *Uploader) UploadTS() {
 // UploadRemaining scans all files in DirPath and uploads any not yet uploaded,
 // except the internal log file (u.InternalLogFilePath).
 func (u *Uploader) UploadRemaining() {
+
 	u.Logger.Info("uploader: uploading remaining files (excluding internal log)")
+	if u.ApiID == "" || u.ApiKey == "" {
+		u.Logger.Error(fmt.Sprintf("Failed to upload: Api-ID or Api-Key are empty! Api-ID: %s, Api-Key: %s", u.ApiID, u.ApiKey))
+		return
+	}
 	filepath.WalkDir(u.DirPath, func(path string, d os.DirEntry, err error) error {
 		if err != nil {
 			u.Logger.Warn(fmt.Sprintf("uploader: walk error: %v", err))
@@ -116,6 +127,10 @@ func (u *Uploader) UploadLogFile() {
 	}
 	path := u.InternalLogFilePath
 	u.Logger.Info(fmt.Sprintf("uploader: scheduling internal log upload %s", path))
+	if u.ApiID == "" || u.ApiKey == "" {
+		u.Logger.Error(fmt.Sprintf("Failed to upload: Api-ID or Api-Key are empty! Api-ID: %s, Api-Key: %s", u.ApiID, u.ApiKey))
+		return
+	}
 	u.WG.Add(1)
 	go u.uploadFile(path)
 }

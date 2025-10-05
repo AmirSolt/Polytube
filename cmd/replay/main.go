@@ -129,12 +129,6 @@ func parseFlags() *cliConfig {
 	if cfg.Endpoint == "" {
 		missing = append(missing, "--endpoint")
 	}
-	if cfg.ApiID == "" {
-		missing = append(missing, "--api-id")
-	}
-	if cfg.ApiKey == "" {
-		missing = append(missing, "--api-key")
-	}
 
 	if len(missing) > 0 {
 		fmt.Fprintf(os.Stderr, "missing required flags: %v\n", missing)

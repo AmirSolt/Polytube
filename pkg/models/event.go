@@ -2,10 +2,6 @@
 // such as Event, which represents a single analytics record.
 package models
 
-import (
-	"time"
-)
-
 type EventType int
 
 const (
@@ -55,7 +51,7 @@ func (e EventLevel) String() string {
 }
 
 type Event struct {
-	Timestamp  time.Time `json:"timestamp"`  // Converted from number (Unix or RFC3339)
+	Timestamp  EpochTime `json:"timestamp"`  // Converted from number (Unix or RFC3339)
 	EventType  string    `json:"eventType"`  // "INPUT_LOG" | "CONSOLE_LOG"
 	EventLevel string    `json:"eventLevel"` // "LOG" | "WARNING" | "ERROR" | "MOUSE" | "KEYBOARD" | "JOYPAD"
 	Content    string    `json:"content"`
