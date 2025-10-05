@@ -1,0 +1,17 @@
+/build/
+/bin/
+/dist/
+*.exe
+*.dll
+*.so
+*.a
+*.out
+
+# Editor & OS files
+.DS_Store
+.idea/
+.vscode/
+*.log
+
+# Go cache
+**/assets/ffmpeg/ffmpeg.exe
