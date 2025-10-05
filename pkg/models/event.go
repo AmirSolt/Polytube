@@ -51,9 +51,9 @@ func (e EventLevel) String() string {
 }
 
 type Event struct {
-	Timestamp  EpochTime `json:"timestamp"`  // Converted from number (Unix or RFC3339)
-	EventType  string    `json:"eventType"`  // "INPUT_LOG" | "CONSOLE_LOG"
-	EventLevel string    `json:"eventLevel"` // "LOG" | "WARNING" | "ERROR" | "MOUSE" | "KEYBOARD" | "JOYPAD"
-	Content    string    `json:"content"`
-	Value      float64   `json:"value"`
+	Timestamp  float64 `json:"timestamp"`  // Converted from number (Unix or RFC3339)
+	EventType  string  `json:"eventType"`  // "INPUT_LOG" | "CONSOLE_LOG"
+	EventLevel string  `json:"eventLevel"` // "LOG" | "WARNING" | "ERROR" | "MOUSE" | "KEYBOARD" | "JOYPAD"
+	Content    string  `json:"content"`
+	Value      float64 `json:"value"`
 }

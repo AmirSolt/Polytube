@@ -14,10 +14,12 @@ import (
 	"polytube/replay/internal/events"
 	"polytube/replay/internal/logger"
 	"polytube/replay/pkg/models"
+	"polytube/replay/utils"
 )
 
-// --- InputListener ---
+const POLL_INTERVAL_MS = 50
 
+// --- InputListener ---
 type InputListener struct {
 	EventLogger *events.EventLogger
 	Logger      *logger.Logger
@@ -71,7 +73,7 @@ func (l *InputListener) Start(ctx context.Context) {
 
 	l.Logger.Info("GLFW input callbacks installed")
 
-	ticker := time.NewTicker(100 * time.Millisecond)
+	ticker := time.NewTicker(POLL_INTERVAL_MS * time.Millisecond)
 	defer ticker.Stop()
 
 	for {
@@ -214,7 +216,7 @@ func (l *InputListener) logEvent(level models.EventLevel, key string, value floa
 	l.lastStates[id] = value
 
 	event := models.Event{
-		Timestamp:  models.EpochTime(time.Now().UTC()),
+		Timestamp:  utils.NowEpochSeconds(),
 		EventType:  models.EventTypeInputLog.String(),
 		EventLevel: level.String(),
 		Content:    key,

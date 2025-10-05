@@ -16,11 +16,11 @@ import (
 	"fmt"
 	"os"
 	"strings"
-	"time"
 
 	"polytube/replay/internal/events"
 	"polytube/replay/internal/logger"
 	"polytube/replay/pkg/models"
+	"polytube/replay/utils"
 )
 
 // ConsoleListener reads stdin lines and logs them as events.
@@ -64,7 +64,7 @@ func (c *ConsoleListener) Start(ctx context.Context) {
 			}
 
 			event := models.Event{
-				Timestamp:  models.EpochTime(time.Now().UTC()),
+				Timestamp:  utils.NowEpochSeconds(),
 				EventType:  models.EventTypeConsoleLog.String(),
 				EventLevel: models.EventLevelLog.String(),
 				Content:    line,

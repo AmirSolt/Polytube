@@ -13,8 +13,8 @@ import (
 	"bufio"
 	"fmt"
 	"os"
+	"polytube/replay/utils"
 	"sync"
-	"time"
 )
 
 // Logger writes timestamped log lines to a file.
@@ -58,18 +58,13 @@ func (l *Logger) write(level, msg string) {
 	l.Mu.Lock()
 	defer l.Mu.Unlock()
 
-	now := time.Now().UTC()
-	// Convert to float seconds with milliseconds precision
-	epochSeconds := float64(now.UnixNano()) / 1e9
-	timestamp := fmt.Sprintf("%.3f", epochSeconds)
-
 	if l.closed {
 		// fallback if closed: print to stderr
-		fmt.Fprintf(os.Stderr, "[%s] [%s] %s\n", timestamp, level, msg)
+		fmt.Fprintf(os.Stderr, "[%f] [%s] %s\n", utils.NowEpochSeconds(), level, msg)
 		return
 	}
 
-	line := fmt.Sprintf("[%s] [%s] %s\n", timestamp, level, msg)
+	line := fmt.Sprintf("[%f] [%s] %s\n", utils.NowEpochSeconds(), level, msg)
 
 	if _, err := l.Writer.WriteString(line); err != nil {
 		fmt.Fprintf(os.Stderr, "logger write failed: %v\n", err)
