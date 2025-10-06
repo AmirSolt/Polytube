@@ -1,5 +1,3 @@
-//go:build windows
-
 package input
 
 import (
@@ -9,12 +7,12 @@ import (
 	"runtime"
 	"time"
 
-	"github.com/go-gl/glfw/v3.3/glfw"
-
 	"polytube/replay/internal/events"
 	"polytube/replay/internal/logger"
 	"polytube/replay/pkg/models"
 	"polytube/replay/utils"
+
+	"github.com/go-gl/glfw/v3.3/glfw"
 )
 
 const POLL_INTERVAL_MS = 50
