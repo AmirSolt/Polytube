@@ -17,11 +17,15 @@ var ffmpegBytes embed.FS
 
 func ExtractFFmpeg() (string, error) {
 	baseTemp := os.TempDir()
-	fixedDir := filepath.Join(baseTemp, "___replay_ffmpeg_____")
+	fixedDir := filepath.Join(baseTemp, "polytube_replay_ffmpeg")
 	if err := os.MkdirAll(fixedDir, 0o755); err != nil {
 		return "", fmt.Errorf("create dir: %w", err)
 	}
 	outPath := filepath.Join(fixedDir, "ffmpeg.exe")
+	if _, err := os.Stat(outPath); err == nil {
+		return outPath, nil
+	}
+
 	if _, err := os.Stat(outPath); err == nil {
 		return outPath, nil
 	}
