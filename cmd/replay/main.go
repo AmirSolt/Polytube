@@ -48,7 +48,7 @@ type serviceBundle struct {
 	cancel          context.CancelFunc
 	rec             *recorder.Recorder
 	upl             *uploader.Uploader
-	eventLogger     *events.EventLogger
+	eventLogger     *events.ArrowEventLogger
 	internalLogger  *logger.Logger
 	inputListener   *input.InputListener
 	consoleListener *console.ConsoleListener
@@ -165,7 +165,7 @@ func startServices(cfg *cliConfig, internalLogPath, eventsPath string) (*service
 	// =====================
 
 	// Structured event logger (ndjson).
-	evLog, err := events.NewEventLogger(eventsPath)
+	evLog, err := events.NewArrowEventLogger(eventsPath)
 	if err != nil {
 		intLog.Error(fmt.Sprintf("create event logger failed: %v", err))
 		_ = intLog.Close()

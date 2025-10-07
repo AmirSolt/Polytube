@@ -25,7 +25,7 @@ import (
 
 // ConsoleListener reads stdin lines and logs them as events.
 type ConsoleListener struct {
-	EventLogger *events.EventLogger
+	EventLogger *events.ArrowEventLogger
 	Logger      *logger.Logger
 }
 

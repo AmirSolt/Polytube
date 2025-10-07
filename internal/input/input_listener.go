@@ -16,10 +16,11 @@ import (
 )
 
 const POLL_INTERVAL_MS = 50
+const ANALOG_THRESHOLD = 0.5 // 50% threshold for analog change
 
 // --- InputListener ---
 type InputListener struct {
-	EventLogger *events.EventLogger
+	EventLogger *events.ArrowEventLogger
 	Logger      *logger.Logger
 	lastStates  map[string]float64
 }
@@ -29,7 +30,7 @@ func (l *InputListener) Start(ctx context.Context) {
 	if l.EventLogger == nil || l.Logger == nil {
 		return
 	}
-	l.Logger.Info("input listener: starting GLFW + XInput listeners")
+	l.Logger.Info("input listener: starting GLFW joystick + keyboard + mouse")
 	l.lastStates = make(map[string]float64)
 
 	// GLFW must run on main OS thread
@@ -41,22 +42,6 @@ func (l *InputListener) Start(ctx context.Context) {
 	}
 	defer glfw.Terminate()
 
-	// --- Detect joysticks ---
-	for jid := glfw.Joystick1; jid <= glfw.Joystick16; jid++ {
-		if jid.Present() {
-			name := jid.GetName()
-			axes := jid.GetAxes()
-			buttons := jid.GetButtons()
-			isGamepad := jid.IsGamepad()
-			l.Logger.Info(fmt.Sprintf("Joystick %d detected: %s | IsGamepad=%v | Axes=%d | Buttons=%d",
-				jid, name, isGamepad, len(axes), len(buttons)))
-
-			if len(axes) == 0 && len(buttons) == 0 {
-				l.Logger.Warn(fmt.Sprintf("Joystick %d (%s): no axes/buttons detected — GLFW cannot read input", jid, name))
-			}
-		}
-	}
-
 	// Create hidden window for keyboard/mouse input
 	glfw.WindowHint(glfw.Visible, glfw.False)
 	window, err := glfw.CreateWindow(640, 480, "Input Listener", nil, nil)
@@ -66,8 +51,13 @@ func (l *InputListener) Start(ctx context.Context) {
 	}
 	window.MakeContextCurrent()
 
+	// Set callbacks
 	window.SetKeyCallback(l.onKey)
 	window.SetMouseButtonCallback(l.onMouseButton)
+
+	// Sticky input ensures no missed presses
+	window.SetInputMode(glfw.StickyKeysMode, glfw.True)
+	window.SetInputMode(glfw.StickyMouseButtonsMode, glfw.True)
 
 	l.Logger.Info("GLFW input callbacks installed")
 
@@ -83,8 +73,7 @@ func (l *InputListener) Start(ctx context.Context) {
 
 		case <-ticker.C:
 			glfw.PollEvents()
-			l.pollGLFWJoysticks()
-			l.pollXInputControllers()
+			l.pollJoysticks()
 		}
 	}
 }
@@ -104,6 +93,7 @@ func (l *InputListener) onKey(w *glfw.Window, key glfw.Key, scancode int, action
 	}
 }
 
+// --- Mouse callback ---
 func (l *InputListener) onMouseButton(w *glfw.Window, button glfw.MouseButton, action glfw.Action, mods glfw.ModifierKey) {
 	btnName, ok := mouseBtnNames[button]
 	if !ok {
@@ -118,88 +108,35 @@ func (l *InputListener) onMouseButton(w *glfw.Window, button glfw.MouseButton, a
 	}
 }
 
-// --- Poll GLFW joysticks (if supported) ---
-func (l *InputListener) pollGLFWJoysticks() {
+// --- Poll GLFW Joysticks ---
+func (l *InputListener) pollJoysticks() {
 	for jid := glfw.Joystick1; jid <= glfw.Joystick16; jid++ {
-		if !jid.Present() || !jid.IsGamepad() {
+		if !jid.Present() {
 			continue
 		}
 
-		state := jid.GetGamepadState()
-		if state == nil {
-			continue
+		axes := jid.GetAxes()
+		buttons := jid.GetButtons()
+
+		// Log axes with threshold
+		for i, axis := range axes {
+			key := fmt.Sprintf("Axis_%d", i)
+			l.logEvent(models.EventLevelJoypad, key, float64(axis))
 		}
 
-		name := jid.GetGamepadName()
-		if name == "" {
-			name = fmt.Sprintf("Joystick_%d", jid)
-		}
-
-		for i, pressed := range state.Buttons {
+		// Log button states
+		for i, pressed := range buttons {
 			val := 0.0
 			if pressed == glfw.Press {
 				val = 1.0
 			}
-			key := fmt.Sprintf("%s_Button_%s", name, gamepadButtonName(i))
+			key := fmt.Sprintf("Button_%d", i)
 			l.logEvent(models.EventLevelJoypad, key, val)
-		}
-		for i, axis := range state.Axes {
-			key := fmt.Sprintf("%s_Axis_%s", name, gamepadAxisName(i))
-			l.logEvent(models.EventLevelJoypad, key, float64(axis))
 		}
 	}
 }
 
-// --- Poll Xbox controllers via XInput ---
-func (l *InputListener) pollXInputControllers() {
-	for i := uint32(0); i < 4; i++ {
-		state, err := XInputGetState(i)
-		if err != nil {
-			continue // not connected
-		}
-
-		name := fmt.Sprintf("XInput_%d", i)
-		g := state.Gamepad
-
-		buttons := []struct {
-			name string
-			mask uint16
-		}{
-			{"DPad_Up", 0x0001},
-			{"DPad_Down", 0x0002},
-			{"DPad_Left", 0x0004},
-			{"DPad_Right", 0x0008},
-			{"Start", 0x0010},
-			{"Back", 0x0020},
-			{"LThumb", 0x0040},
-			{"RThumb", 0x0080},
-			{"LB", 0x0100},
-			{"RB", 0x0200},
-			{"A", 0x1000},
-			{"B", 0x2000},
-			{"X", 0x4000},
-			{"Y", 0x8000},
-		}
-		for _, b := range buttons {
-			val := 0.0
-			if g.Buttons&b.mask != 0 {
-				val = 1.0
-			}
-			key := fmt.Sprintf("%s_Button_%s", name, b.name)
-			l.logEvent(models.EventLevelJoypad, key, val)
-		}
-
-		// Analog axes
-		l.logEvent(models.EventLevelJoypad, name+"_Axis_LeftX", float64(g.ThumbLX)/32767.0)
-		l.logEvent(models.EventLevelJoypad, name+"_Axis_LeftY", float64(g.ThumbLY)/32767.0)
-		l.logEvent(models.EventLevelJoypad, name+"_Axis_RightX", float64(g.ThumbRX)/32767.0)
-		l.logEvent(models.EventLevelJoypad, name+"_Axis_RightY", float64(g.ThumbRY)/32767.0)
-		l.logEvent(models.EventLevelJoypad, name+"_Axis_LT", float64(g.LeftTrigger)/255.0)
-		l.logEvent(models.EventLevelJoypad, name+"_Axis_RT", float64(g.RightTrigger)/255.0)
-	}
-}
-
-// --- Deduplicated logging ---
+// --- Deduplicated logging with thresholds ---
 func (l *InputListener) logEvent(level models.EventLevel, key string, value float64) {
 	if key == "" {
 		return
@@ -207,15 +144,13 @@ func (l *InputListener) logEvent(level models.EventLevel, key string, value floa
 	id := level.String() + ":" + key
 	prev, ok := l.lastStates[id]
 
-	// Apply thresholds:
 	if ok {
-		// Analog threshold: skip if change < 0.05
-		if level == models.EventLevelJoypad && isAnalogKey(key) {
-			if math.Abs(prev-value) < 0.05 {
-				return
-			}
-		} else if prev == value {
-			// For buttons or non-analogs, require exact change
+		// Analog threshold
+		if level == models.EventLevelJoypad && math.Abs(prev-value) < ANALOG_THRESHOLD {
+			return
+		}
+		// Buttons/keyboard/mouse exact change only
+		if prev == value {
 			return
 		}
 	}
@@ -234,36 +169,7 @@ func (l *InputListener) logEvent(level models.EventLevel, key string, value floa
 	}
 }
 
-// --- Human-readable mappings ---
-func gamepadButtonName(index int) string {
-	names := []string{
-		"A", "B", "X", "Y",
-		"LB", "RB", "Back", "Start",
-		"Guide", "LThumb", "RThumb",
-		"DPad_Up", "DPad_Right", "DPad_Down", "DPad_Left",
-	}
-	if index >= 0 && index < len(names) {
-		return names[index]
-	}
-	return fmt.Sprintf("Unknown_%d", index)
-}
-
-func gamepadAxisName(index int) string {
-	names := []string{
-		"LeftX", "LeftY", "RightX", "RightY", "LT", "RT",
-	}
-	if index >= 0 && index < len(names) {
-		return names[index]
-	}
-	return fmt.Sprintf("Unknown_%d", index)
-}
-
-func isAnalogKey(key string) bool {
-	return key == "LeftX" || key == "LeftY" ||
-		key == "RightX" || key == "RightY" ||
-		key == "LT" || key == "RT"
-}
-
+// --- Human-readable names ---
 var mouseBtnNames = map[glfw.MouseButton]string{
 	glfw.MouseButtonLeft:   "LEFT_BUTTON",
 	glfw.MouseButtonRight:  "RIGHT_BUTTON",
@@ -271,32 +177,8 @@ var mouseBtnNames = map[glfw.MouseButton]string{
 }
 
 var keyNames = map[glfw.Key]string{
-	glfw.KeySpace:        "SPACE",
-	glfw.KeyApostrophe:   "APOSTROPHE",
-	glfw.KeyComma:        "COMMA",
-	glfw.KeyMinus:        "MINUS",
-	glfw.KeyPeriod:       "PERIOD",
-	glfw.KeySlash:        "SLASH",
-	glfw.Key0:            "NUM_0",
-	glfw.Key1:            "NUM_1",
-	glfw.Key2:            "NUM_2",
-	glfw.Key3:            "NUM_3",
-	glfw.Key4:            "NUM_4",
-	glfw.Key5:            "NUM_5",
-	glfw.Key6:            "NUM_6",
-	glfw.Key7:            "NUM_7",
-	glfw.Key8:            "NUM_8",
-	glfw.Key9:            "NUM_9",
-	glfw.KeySemicolon:    "SEMICOLON",
-	glfw.KeyEqual:        "EQUAL",
-	glfw.KeyLeftBracket:  "LEFT_BRACKET",
-	glfw.KeyRightBracket: "RIGHT_BRACKET",
-	glfw.KeyBackslash:    "BACKSLASH",
-	glfw.KeyGraveAccent:  "GRAVE_ACCENT",
-	glfw.KeyWorld1:       "WORLD_1",
-	glfw.KeyWorld2:       "WORLD_2",
-
-	glfw.KeyA: "A", glfw.KeyB: "B", glfw.KeyC: "C", glfw.KeyD: "D",
+	glfw.KeySpace: "SPACE",
+	glfw.KeyA:     "A", glfw.KeyB: "B", glfw.KeyC: "C", glfw.KeyD: "D",
 	glfw.KeyE: "E", glfw.KeyF: "F", glfw.KeyG: "G", glfw.KeyH: "H",
 	glfw.KeyI: "I", glfw.KeyJ: "J", glfw.KeyK: "K", glfw.KeyL: "L",
 	glfw.KeyM: "M", glfw.KeyN: "N", glfw.KeyO: "O", glfw.KeyP: "P",
@@ -304,42 +186,14 @@ var keyNames = map[glfw.Key]string{
 	glfw.KeyU: "U", glfw.KeyV: "V", glfw.KeyW: "W", glfw.KeyX: "X",
 	glfw.KeyY: "Y", glfw.KeyZ: "Z",
 
-	glfw.KeyEscape:       "ESCAPE",
 	glfw.KeyEnter:        "ENTER",
+	glfw.KeyEscape:       "ESCAPE",
+	glfw.KeyLeftShift:    "LEFT_SHIFT",
+	glfw.KeyRightShift:   "RIGHT_SHIFT",
+	glfw.KeyLeftControl:  "LEFT_CONTROL",
+	glfw.KeyRightControl: "RIGHT_CONTROL",
+	glfw.KeyLeftAlt:      "LEFT_ALT",
+	glfw.KeyRightAlt:     "RIGHT_ALT",
 	glfw.KeyTab:          "TAB",
 	glfw.KeyBackspace:    "BACKSPACE",
-	glfw.KeyInsert:       "INSERT",
-	glfw.KeyDelete:       "DELETE",
-	glfw.KeyRight:        "ARROW_RIGHT",
-	glfw.KeyLeft:         "ARROW_LEFT",
-	glfw.KeyDown:         "ARROW_DOWN",
-	glfw.KeyUp:           "ARROW_UP",
-	glfw.KeyPageUp:       "PAGE_UP",
-	glfw.KeyPageDown:     "PAGE_DOWN",
-	glfw.KeyHome:         "HOME",
-	glfw.KeyEnd:          "END",
-	glfw.KeyCapsLock:     "CAPS_LOCK",
-	glfw.KeyScrollLock:   "SCROLL_LOCK",
-	glfw.KeyNumLock:      "NUM_LOCK",
-	glfw.KeyPrintScreen:  "PRINT_SCREEN",
-	glfw.KeyPause:        "PAUSE",
-	glfw.KeyF1:           "F1",
-	glfw.KeyF2:           "F2",
-	glfw.KeyF3:           "F3",
-	glfw.KeyF4:           "F4",
-	glfw.KeyF5:           "F5",
-	glfw.KeyF6:           "F6",
-	glfw.KeyF7:           "F7",
-	glfw.KeyF8:           "F8",
-	glfw.KeyF9:           "F9",
-	glfw.KeyF10:          "F10",
-	glfw.KeyF11:          "F11",
-	glfw.KeyF12:          "F12",
-	glfw.KeyLeftShift:    "LEFT_SHIFT",
-	glfw.KeyLeftControl:  "LEFT_CONTROL",
-	glfw.KeyLeftAlt:      "LEFT_ALT",
-	glfw.KeyRightShift:   "RIGHT_SHIFT",
-	glfw.KeyRightControl: "RIGHT_CONTROL",
-	glfw.KeyRightAlt:     "RIGHT_ALT",
-	glfw.KeyMenu:         "MENU",
 }
