@@ -70,7 +70,7 @@ func main() {
 
 	// Prepare file paths under the output folder.
 	internalLogPath := filepath.Join(cfg.OutPath, "internal.log")
-	eventsPath := filepath.Join(cfg.OutPath, "events.ndjson")
+	eventsPath := filepath.Join(cfg.OutPath, "events.arrow")
 
 	// Initialize services and start background tasks.
 	svcs, err := startServices(cfg, internalLogPath, eventsPath)
