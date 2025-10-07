@@ -111,7 +111,7 @@ func parseFlags() *cliConfig {
 	flag.StringVar(&cfg.Endpoint, "endpoint", "https://www.polytube.io/api/sign", "Upload endpoint URL")
 	flag.StringVar(&cfg.ApiID, "api-id", "", "API ID header value")
 	flag.StringVar(&cfg.ApiKey, "api-key", "", "API Key header value")
-	flag.StringVar(&cfg.SessionID, "session-id", uuid.New().String(), "Session id.")
+	flag.StringVar(&cfg.SessionID, "session-id", "", "Session id.")
 	flag.StringVar(&cfg.FFmpegPath, "ffmpeg", "", "Path to ffmpeg.exe (optional; defaults to ./ffmpeg_bin/ffmpeg.exe relative to the executable)")
 	flag.IntVar(&cfg.PollSeconds, "poll", defaultPollSeconds, "Uploader poll interval in seconds")
 	flag.Parse()
@@ -128,6 +128,9 @@ func parseFlags() *cliConfig {
 	}
 	if cfg.Endpoint == "" {
 		missing = append(missing, "--endpoint")
+	}
+	if cfg.SessionID == "" {
+		cfg.SessionID = uuid.New().String()
 	}
 
 	if len(missing) > 0 {
