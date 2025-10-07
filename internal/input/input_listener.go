@@ -91,20 +91,29 @@ func (l *InputListener) Start(ctx context.Context) {
 
 // --- Keyboard callback ---
 func (l *InputListener) onKey(w *glfw.Window, key glfw.Key, scancode int, action glfw.Action, mods glfw.ModifierKey) {
-	keyName := fmt.Sprintf("Key_%d", key)
-	if action == glfw.Press {
+	keyName, ok := keyNames[key]
+	if !ok {
+		keyName = fmt.Sprintf("KEY_%d", key)
+	}
+
+	switch action {
+	case glfw.Press:
 		l.logEvent(models.EventLevelKeyboard, keyName, 1)
-	} else if action == glfw.Release {
+	case glfw.Release:
 		l.logEvent(models.EventLevelKeyboard, keyName, 0)
 	}
 }
 
-// --- Mouse callback ---
 func (l *InputListener) onMouseButton(w *glfw.Window, button glfw.MouseButton, action glfw.Action, mods glfw.ModifierKey) {
-	btnName := fmt.Sprintf("MouseButton_%d", button)
-	if action == glfw.Press {
+	btnName, ok := mouseBtnNames[button]
+	if !ok {
+		btnName = fmt.Sprintf("MOUSE_%d", button)
+	}
+
+	switch action {
+	case glfw.Press:
 		l.logEvent(models.EventLevelMouse, btnName, 1)
-	} else if action == glfw.Release {
+	case glfw.Release:
 		l.logEvent(models.EventLevelMouse, btnName, 0)
 	}
 }
@@ -253,4 +262,94 @@ func isAnalogKey(key string) bool {
 	return key == "LeftX" || key == "LeftY" ||
 		key == "RightX" || key == "RightY" ||
 		key == "LT" || key == "RT"
+}
+
+var mouseBtnNames = map[glfw.MouseButton]string{
+	glfw.MouseButtonLeft:   "LEFT_BUTTON",
+	glfw.MouseButtonRight:  "RIGHT_BUTTON",
+	glfw.MouseButtonMiddle: "MIDDLE_BUTTON",
+}
+
+var keyNames = map[glfw.Key]string{
+	glfw.KeySpace:        "SPACE",
+	glfw.KeyApostrophe:   "'",
+	glfw.KeyComma:        ",",
+	glfw.KeyMinus:        "-",
+	glfw.KeyPeriod:       ".",
+	glfw.KeySlash:        "/",
+	glfw.Key0:            "0",
+	glfw.Key1:            "1",
+	glfw.Key2:            "2",
+	glfw.Key3:            "3",
+	glfw.Key4:            "4",
+	glfw.Key5:            "5",
+	glfw.Key6:            "6",
+	glfw.Key7:            "7",
+	glfw.Key8:            "8",
+	glfw.Key9:            "9",
+	glfw.KeySemicolon:    ";",
+	glfw.KeyEqual:        "=",
+	glfw.KeyA:            "A",
+	glfw.KeyB:            "B",
+	glfw.KeyC:            "C",
+	glfw.KeyD:            "D",
+	glfw.KeyE:            "E",
+	glfw.KeyF:            "F",
+	glfw.KeyG:            "G",
+	glfw.KeyH:            "H",
+	glfw.KeyI:            "I",
+	glfw.KeyJ:            "J",
+	glfw.KeyK:            "K",
+	glfw.KeyL:            "L",
+	glfw.KeyM:            "M",
+	glfw.KeyN:            "N",
+	glfw.KeyO:            "O",
+	glfw.KeyP:            "P",
+	glfw.KeyQ:            "Q",
+	glfw.KeyR:            "R",
+	glfw.KeyS:            "S",
+	glfw.KeyT:            "T",
+	glfw.KeyU:            "U",
+	glfw.KeyV:            "V",
+	glfw.KeyW:            "W",
+	glfw.KeyX:            "X",
+	glfw.KeyY:            "Y",
+	glfw.KeyZ:            "Z",
+	glfw.KeyEscape:       "ESCAPE",
+	glfw.KeyEnter:        "ENTER",
+	glfw.KeyTab:          "TAB",
+	glfw.KeyBackspace:    "BACKSPACE",
+	glfw.KeyInsert:       "INSERT",
+	glfw.KeyDelete:       "DELETE",
+	glfw.KeyRight:        "RIGHT",
+	glfw.KeyLeft:         "LEFT",
+	glfw.KeyDown:         "DOWN",
+	glfw.KeyUp:           "UP",
+	glfw.KeyPageUp:       "PAGE_UP",
+	glfw.KeyPageDown:     "PAGE_DOWN",
+	glfw.KeyHome:         "HOME",
+	glfw.KeyEnd:          "END",
+	glfw.KeyCapsLock:     "CAPS_LOCK",
+	glfw.KeyScrollLock:   "SCROLL_LOCK",
+	glfw.KeyNumLock:      "NUM_LOCK",
+	glfw.KeyPrintScreen:  "PRINT_SCREEN",
+	glfw.KeyPause:        "PAUSE",
+	glfw.KeyF1:           "F1",
+	glfw.KeyF2:           "F2",
+	glfw.KeyF3:           "F3",
+	glfw.KeyF4:           "F4",
+	glfw.KeyF5:           "F5",
+	glfw.KeyF6:           "F6",
+	glfw.KeyF7:           "F7",
+	glfw.KeyF8:           "F8",
+	glfw.KeyF9:           "F9",
+	glfw.KeyF10:          "F10",
+	glfw.KeyF11:          "F11",
+	glfw.KeyF12:          "F12",
+	glfw.KeyLeftShift:    "LEFT_SHIFT",
+	glfw.KeyLeftControl:  "LEFT_CTRL",
+	glfw.KeyLeftAlt:      "LEFT_ALT",
+	glfw.KeyRightShift:   "RIGHT_SHIFT",
+	glfw.KeyRightControl: "RIGHT_CTRL",
+	glfw.KeyRightAlt:     "RIGHT_ALT",
 }
