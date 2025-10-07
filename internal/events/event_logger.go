@@ -43,10 +43,6 @@ func NewArrowEventLogger(path string) (*ArrowEventLogger, error) {
 		ipc.WithSchema(schema),
 		ipc.WithZstd(), // change to ipc.WithLZ4() if you prefer faster compression
 	)
-	if err != nil {
-		file.Close()
-		return nil, fmt.Errorf("arrow event logger writer: %w", err)
-	}
 
 	builder := array.NewRecordBuilder(pool, schema)
 
