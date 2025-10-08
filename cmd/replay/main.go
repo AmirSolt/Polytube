@@ -38,8 +38,8 @@ type cliConfig struct {
 	ApiID       string
 	ApiKey      string
 	SessionID   string
-	FFmpegPath  string
 	PollSeconds int
+	IsLoading   bool
 }
 
 // serviceBundle groups all running components so main can manage their lifecycle.
@@ -48,7 +48,7 @@ type serviceBundle struct {
 	cancel          context.CancelFunc
 	rec             *recorder.Recorder
 	upl             *uploader.Uploader
-	eventLogger     *events.ArrowEventLogger
+	eventLogger     *events.ParquetEventLogger
 	internalLogger  *logger.Logger
 	inputListener   *input.InputListener
 	consoleListener *console.ConsoleListener
@@ -58,22 +58,33 @@ type serviceBundle struct {
 func main() {
 	cfg := parseFlags()
 
-	// Ensure output directory exists.
+	dataDir := filepath.Join(cfg.OutPath, "data")
+	// Prepare file paths under the output folder.
+	internalLogPath := filepath.Join(dataDir, "internal.log")
+	eventsPath := filepath.Join(dataDir, "events.parquet")
+	ffmpegPath := filepath.Join(cfg.OutPath, "ffmpeg.exe")
+
 	if err := ensureDir(cfg.OutPath); err != nil {
 		fmt.Fprintf(os.Stderr, "failed to create out directory: %v\n", err)
 		os.Exit(1)
 	}
-	if err := wipeDir(cfg.OutPath); err != nil {
-		fmt.Fprintf(os.Stderr, "failed to wipe out directory: %v\n", err)
+	if err := ensureAndWipeDir(dataDir); err != nil {
+		fmt.Fprintf(os.Stderr, "failed to create or wipe data directory: %v\n", err)
 		os.Exit(1)
 	}
 
-	// Prepare file paths under the output folder.
-	internalLogPath := filepath.Join(cfg.OutPath, "internal.log")
-	eventsPath := filepath.Join(cfg.OutPath, "events.arrow")
+	if err := recorder.LoadFFmpeg(ffmpegPath); err != nil {
+		fmt.Fprintf(os.Stderr, "failed to load FFmpeg: %v\n", err)
+		os.Exit(1)
+	}
+
+	if cfg.IsLoading {
+		fmt.Println("Loading complete.")
+		os.Exit(0)
+	}
 
 	// Initialize services and start background tasks.
-	svcs, err := startServices(cfg, internalLogPath, eventsPath)
+	svcs, err := startServices(cfg, dataDir, internalLogPath, eventsPath, ffmpegPath)
 	if err != nil {
 		// Best-effort stderr message since internal logger may not have initialized.
 		fmt.Fprintf(os.Stderr, "startup error: %v\n", err)
@@ -106,13 +117,13 @@ func main() {
 func parseFlags() *cliConfig {
 	cfg := &cliConfig{}
 
-	flag.StringVar(&cfg.Title, "title", "", "Window title to record (exact match)")
-	flag.StringVar(&cfg.OutPath, "out", "", "Output directory for HLS segments and logs")
+	flag.BoolVar(&cfg.IsLoading, "load", false, "Loads nessesary binaries (ffmpeg) and exits. Ignores other flags.")
+	flag.StringVar(&cfg.Title, "title", "", "Window title to record (exact match, use quotes if needed)")
+	flag.StringVar(&cfg.OutPath, "out", "", "Output directory for files")
 	flag.StringVar(&cfg.Endpoint, "endpoint", "https://www.polytube.io/api/sign", "Upload endpoint URL")
 	flag.StringVar(&cfg.ApiID, "api-id", "", "API ID header value")
 	flag.StringVar(&cfg.ApiKey, "api-key", "", "API Key header value")
 	flag.StringVar(&cfg.SessionID, "session-id", "", "Session id.")
-	flag.StringVar(&cfg.FFmpegPath, "ffmpeg", "", "Path to ffmpeg.exe (optional; defaults to ./ffmpeg_bin/ffmpeg.exe relative to the executable)")
 	flag.IntVar(&cfg.PollSeconds, "poll", defaultPollSeconds, "Uploader poll interval in seconds")
 	flag.Parse()
 
@@ -133,7 +144,7 @@ func parseFlags() *cliConfig {
 		cfg.SessionID = uuid.New().String()
 	}
 
-	if len(missing) > 0 {
+	if len(missing) > 0 && !cfg.IsLoading {
 		fmt.Fprintf(os.Stderr, "missing required flags: %v\n", missing)
 		flag.Usage()
 		os.Exit(2)
@@ -144,7 +155,7 @@ func parseFlags() *cliConfig {
 
 // startServices initializes loggers, recorder, uploader, and background listeners/poller.
 // It returns a service bundle with a cancellable context controlling all background work.
-func startServices(cfg *cliConfig, internalLogPath, eventsPath string) (*serviceBundle, error) {
+func startServices(cfg *cliConfig, dataDir, internalLogPath, eventsPath string, ffmpegPath string) (*serviceBundle, error) {
 	// Internal logger first: everything else can log into it.
 	intLog, err := logger.NewLogger(internalLogPath)
 	if err != nil {
@@ -155,20 +166,9 @@ func startServices(cfg *cliConfig, internalLogPath, eventsPath string) (*service
 	// =====================
 	// Log session ID
 	intLog.Info(fmt.Sprintf("Session ID: %s", cfg.SessionID))
-	// =====================
-	// Set FFmpeg path
-	if cfg.FFmpegPath == "" {
-		ffmpegPath, err := recorder.ExtractFFmpeg()
-		if err != nil {
-			intLog.Error(fmt.Sprintf("failed to extract ffmpeg: %v", err))
-			return nil, fmt.Errorf("failed to extract ffmpeg: %w", err)
-		}
-		cfg.FFmpegPath = ffmpegPath
-	}
-	// =====================
 
 	// Structured event logger (ndjson).
-	evLog, err := events.NewArrowEventLogger(eventsPath)
+	evLog, err := events.NewParquetEventLogger(eventsPath)
 	if err != nil {
 		intLog.Error(fmt.Sprintf("create event logger failed: %v", err))
 		_ = intLog.Close()
@@ -176,17 +176,17 @@ func startServices(cfg *cliConfig, internalLogPath, eventsPath string) (*service
 	}
 	intLog.Info("Event logger initialized")
 
-	// Recorder configured to write HLS into cfg.OutPath and log FFmpeg output to internal logger.
+	// Recorder configured to write HLS into dataDir and log FFmpeg output to internal logger.
 	rec := &recorder.Recorder{
 		Title:      cfg.Title,
-		OutPath:    cfg.OutPath,
-		FFmpegPath: cfg.FFmpegPath,
+		DirPath:    dataDir,
+		FFmpegPath: ffmpegPath,
 		Logger:     intLog,
 	}
 
 	// Uploader: maintains in-memory set of uploaded files; logs into internal logger.
 	upl := &uploader.Uploader{
-		DirPath:             cfg.OutPath,
+		DirPath:             dataDir,
 		EndpointURL:         cfg.Endpoint,
 		ApiID:               cfg.ApiID,
 		ApiKey:              cfg.ApiKey,
@@ -307,6 +307,29 @@ func shutdown(svcs *serviceBundle) error {
 	return firstErr
 }
 
+func ensureAndWipeDir(path string) error {
+	// Ensure directory exists
+	if err := os.MkdirAll(path, 0o755); err != nil {
+		return fmt.Errorf("ensure dir: %w", err)
+	}
+
+	// Read all entries inside
+	entries, err := os.ReadDir(path)
+	if err != nil {
+		return fmt.Errorf("read dir: %w", err)
+	}
+
+	// Remove each entry
+	for _, entry := range entries {
+		entryPath := filepath.Join(path, entry.Name())
+		if err := os.RemoveAll(entryPath); err != nil {
+			return fmt.Errorf("remove %s: %w", entryPath, err)
+		}
+	}
+
+	return nil
+}
+
 // ensureDir creates the directory if it does not exist.
 func ensureDir(path string) error {
 	return os.MkdirAll(path, 0o755)
@@ -314,16 +337,16 @@ func ensureDir(path string) error {
 
 // wipeDir removes all contents (files and subdirectories) inside the directory.
 // It does NOT delete the directory itself.
-func wipeDir(path string) error {
-	entries, err := os.ReadDir(path)
-	if err != nil {
-		return fmt.Errorf("read dir: %w", err)
-	}
-	for _, entry := range entries {
-		entryPath := filepath.Join(path, entry.Name())
-		if err := os.RemoveAll(entryPath); err != nil {
-			return fmt.Errorf("remove %s: %w", entryPath, err)
-		}
-	}
-	return nil
-}
+// func wipeDir(path string) error {
+// 	entries, err := os.ReadDir(path)
+// 	if err != nil {
+// 		return fmt.Errorf("read dir: %w", err)
+// 	}
+// 	for _, entry := range entries {
+// 		entryPath := filepath.Join(path, entry.Name())
+// 		if err := os.RemoveAll(entryPath); err != nil {
+// 			return fmt.Errorf("remove %s: %w", entryPath, err)
+// 		}
+// 	}
+// 	return nil
+// }

@@ -4,10 +4,8 @@ package recorder
 
 import (
 	"embed"
-	"fmt"
 	"io"
 	"os"
-	"path/filepath"
 
 	"golang.org/x/sys/windows"
 )
@@ -15,19 +13,10 @@ import (
 //go:embed assets/ffmpeg/ffmpeg.exe
 var ffmpegBytes embed.FS
 
-func ExtractFFmpeg() (string, error) {
-	baseTemp := os.TempDir()
-	fixedDir := filepath.Join(baseTemp, "polytube_replay_ffmpeg")
-	if err := os.MkdirAll(fixedDir, 0o755); err != nil {
-		return "", fmt.Errorf("create dir: %w", err)
-	}
-	outPath := filepath.Join(fixedDir, "ffmpeg.exe")
-	if _, err := os.Stat(outPath); err == nil {
-		return outPath, nil
-	}
+func LoadFFmpeg(ffmpegPath string) error {
 
-	if _, err := os.Stat(outPath); err == nil {
-		return outPath, nil
+	if _, err := os.Stat(ffmpegPath); err == nil {
+		return nil
 	}
 
 	// Lower process priority temporarily
@@ -35,25 +24,25 @@ func ExtractFFmpeg() (string, error) {
 
 	src, err := ffmpegBytes.Open("assets/ffmpeg/ffmpeg.exe")
 	if err != nil {
-		return "", err
+		return err
 	}
 	defer src.Close()
 
-	dst, err := os.Create(outPath)
+	dst, err := os.Create(ffmpegPath)
 	if err != nil {
-		return "", err
+		return err
 	}
 	defer dst.Close()
 
 	// Stream copy instead of loading full file into memory
 	if _, err := io.Copy(dst, src); err != nil {
-		return "", err
+		return err
 	}
 
 	// Restore normal priority
 	setNormalPriority()
 
-	return outPath, nil
+	return nil
 }
 
 func setLowPriority() {

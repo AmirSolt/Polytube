@@ -32,7 +32,7 @@ import (
 // Recorder holds configuration for launching FFmpeg and waiting for it.
 type Recorder struct {
 	Title      string         // exact window title to capture
-	OutPath    string         // directory to place HLS files
+	DirPath    string         // directory to place HLS files
 	FFmpegPath string         // path to ffmpeg.exe
 	Logger     *logger.Logger // internal logger for diagnostic output
 
@@ -63,13 +63,13 @@ func (r *Recorder) Start() error {
 			r.startErr = errors.New("recorder: Title is required")
 			return
 		}
-		if strings.TrimSpace(r.OutPath) == "" {
-			r.startErr = errors.New("recorder: OutPath is required")
+		if strings.TrimSpace(r.DirPath) == "" {
+			r.startErr = errors.New("recorder: DirPath is required")
 			return
 		}
 
 		// Ensure output directory exists.
-		if err := os.MkdirAll(r.OutPath, 0o755); err != nil {
+		if err := os.MkdirAll(r.DirPath, 0o755); err != nil {
 			r.startErr = fmt.Errorf("recorder: create out dir: %w", err)
 			return
 		}
@@ -82,8 +82,8 @@ func (r *Recorder) Start() error {
 		}
 
 		// Construct HLS target file paths.
-		r.manifestPath = filepath.Join(r.OutPath, "playlist.m3u8")
-		r.segmentPattern = filepath.Join(r.OutPath, "output_%03d.ts")
+		r.manifestPath = filepath.Join(r.DirPath, "playlist.m3u8")
+		r.segmentPattern = filepath.Join(r.DirPath, "output_%03d.ts")
 
 		// Build FFmpeg arguments.
 		// Using conservative encoding defaults; tune as needed.

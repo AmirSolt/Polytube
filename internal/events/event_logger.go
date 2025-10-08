@@ -2,103 +2,91 @@ package events
 
 import (
 	"fmt"
-	"os"
 	"sync"
 
 	"polytube/replay/pkg/models"
 
-	"github.com/apache/arrow/go/v16/arrow"
-	"github.com/apache/arrow/go/v16/arrow/array"
-	"github.com/apache/arrow/go/v16/arrow/ipc"
-	"github.com/apache/arrow/go/v16/arrow/memory"
+	"github.com/xitongsys/parquet-go-source/local"
+	"github.com/xitongsys/parquet-go/parquet"
+	"github.com/xitongsys/parquet-go/writer"
 )
 
-// ArrowEventLogger writes events as Arrow IPC stream with compression.
-type ArrowEventLogger struct {
-	mu      sync.Mutex
-	file    *os.File
-	writer  *ipc.Writer
-	builder *array.RecordBuilder
-	schema  *arrow.Schema
+// EventParquetRow defines the schema for each event in the parquet file.
+type EventParquetRow struct {
+	Timestamp  float64 `parquet:"name=timestamp, type=DOUBLE"`
+	EventType  string  `parquet:"name=eventType, type=BYTE_ARRAY, convertedtype=UTF8, encoding=PLAIN_DICTIONARY"`
+	EventLevel string  `parquet:"name=eventLevel, type=BYTE_ARRAY, convertedtype=UTF8, encoding=PLAIN_DICTIONARY"`
+	Content    string  `parquet:"name=content, type=BYTE_ARRAY, convertedtype=UTF8, encoding=PLAIN_DICTIONARY"`
+	Value      float64 `parquet:"name=value, type=DOUBLE"`
 }
 
-// NewArrowEventLogger creates a new Arrow IPC stream with schema and compression.
-func NewArrowEventLogger(path string) (*ArrowEventLogger, error) {
-	file, err := os.Create(path)
+// ParquetEventLogger writes events to a Parquet file.
+type ParquetEventLogger struct {
+	mu     sync.Mutex
+	writer *writer.ParquetWriter
+}
+
+// NewParquetEventLogger creates a new Parquet writer with schema.
+func NewParquetEventLogger(path string) (*ParquetEventLogger, error) {
+	// Create file
+	fw, err := local.NewLocalFileWriter(path)
 	if err != nil {
-		return nil, fmt.Errorf("arrow event logger create: %w", err)
+		return nil, fmt.Errorf("create parquet file: %w", err)
 	}
 
-	pool := memory.NewGoAllocator()
+	// Create parquet writer
+	pw, err := writer.NewParquetWriter(fw, new(EventParquetRow), 1)
+	if err != nil {
+		return nil, fmt.Errorf("create parquet writer: %w", err)
+	}
 
-	schema := arrow.NewSchema([]arrow.Field{
-		{Name: "timestamp", Type: arrow.PrimitiveTypes.Float64},
-		{Name: "eventType", Type: arrow.BinaryTypes.String},
-		{Name: "eventLevel", Type: arrow.BinaryTypes.String},
-		{Name: "content", Type: arrow.BinaryTypes.String},
-		{Name: "value", Type: arrow.PrimitiveTypes.Float64},
-	}, nil)
+	// Optional: set compression codec
+	pw.CompressionType = parquet.CompressionCodec_SNAPPY
 
-	writer := ipc.NewWriter(file,
-		ipc.WithSchema(schema),
-		ipc.WithZstd(), // change to ipc.WithLZ4() if you prefer faster compression
-	)
-
-	builder := array.NewRecordBuilder(pool, schema)
-
-	return &ArrowEventLogger{
-		file:    file,
-		writer:  writer,
-		builder: builder,
-		schema:  schema,
+	return &ParquetEventLogger{
+		writer: pw,
 	}, nil
 }
 
-// LogEvent appends a single event as a one-row Record and writes it.
-func (l *ArrowEventLogger) LogEvent(e models.Event) error {
+// LogEvent appends one row to the parquet file.
+func (l *ParquetEventLogger) LogEvent(e models.Event) error {
 	l.mu.Lock()
 	defer l.mu.Unlock()
 
-	// Append values
-	l.builder.Field(0).(*array.Float64Builder).Append(e.Timestamp)
-	l.builder.Field(1).(*array.StringBuilder).Append(e.EventType)
-	l.builder.Field(2).(*array.StringBuilder).Append(e.EventLevel)
-	l.builder.Field(3).(*array.StringBuilder).Append(e.Content)
-	l.builder.Field(4).(*array.Float64Builder).Append(e.Value)
-
-	// Build record
-	record := l.builder.NewRecord()
-	defer record.Release()
-
-	// Reset builder for next event
-	l.builder.Release()
-	pool := memory.NewGoAllocator()
-	l.builder = array.NewRecordBuilder(pool, l.schema)
-
-	// Write record to stream
-	if err := l.writer.Write(record); err != nil {
-		return fmt.Errorf("arrow event logger write: %w", err)
+	row := EventParquetRow{
+		Timestamp:  e.Timestamp,
+		EventType:  e.EventType,
+		EventLevel: e.EventLevel,
+		Content:    e.Content,
+		Value:      e.Value,
 	}
 
-	// Ensure durability:
-	// Flush OS buffers to disk to prevent data loss on crash
-	if err := l.file.Sync(); err != nil {
-		return fmt.Errorf("arrow event logger sync: %w", err)
+	if err := l.writer.Write(row); err != nil {
+		return fmt.Errorf("parquet write: %w", err)
+	}
+
+	// Optional: Flush periodically if needed
+	if l.writer.RowGroupSize >= 1000 {
+		if err := l.writer.WriteStop(); err != nil {
+			return fmt.Errorf("flush parquet: %w", err)
+		}
 	}
 
 	return nil
 }
 
-// Close closes the writer and file.
-func (l *ArrowEventLogger) Close() error {
+// Close finalizes the file.
+func (l *ParquetEventLogger) Close() error {
 	l.mu.Lock()
 	defer l.mu.Unlock()
-	if err := l.writer.Close(); err != nil {
-		return fmt.Errorf("arrow event logger close writer: %w", err)
+
+	if err := l.writer.WriteStop(); err != nil {
+		return fmt.Errorf("close parquet writer: %w", err)
 	}
-	if err := l.file.Close(); err != nil {
-		return fmt.Errorf("arrow event logger close file: %w", err)
+
+	if err := l.writer.PFile.Close(); err != nil {
+		return fmt.Errorf("close parquet file: %w", err)
 	}
-	l.builder.Release()
+
 	return nil
 }
