@@ -43,12 +43,13 @@ func (l *InputListener) Start(ctx context.Context) {
 	defer glfw.Terminate()
 
 	// Create hidden window for keyboard/mouse input
-	glfw.WindowHint(glfw.Visible, glfw.False)
+	glfw.WindowHint(glfw.Visible, glfw.True)
 	window, err := glfw.CreateWindow(640, 480, "Input Listener", nil, nil)
 	if err != nil {
 		l.Logger.Warn(fmt.Sprintf("GLFW window creation failed: %v", err))
 		return
 	}
+	window.Focus()
 	window.MakeContextCurrent()
 
 	// Set callbacks
@@ -118,20 +119,26 @@ func (l *InputListener) pollJoysticks() {
 		axes := jid.GetAxes()
 		buttons := jid.GetButtons()
 
-		// Log axes with threshold
+		// Log axes
 		for i, axis := range axes {
-			key := fmt.Sprintf("Axis_%d", i)
-			l.logEvent(models.EventLevelJoypad, key, float64(axis))
+			name, ok := AxisNames[i]
+			if !ok {
+				name = fmt.Sprintf("Axis%d", i)
+			}
+			l.logEvent(models.EventLevelJoypad, name, float64(axis))
 		}
 
 		// Log button states
 		for i, pressed := range buttons {
-			val := 0.0
+			value := 0.0
 			if pressed == glfw.Press {
-				val = 1.0
+				value = 1.0
 			}
-			key := fmt.Sprintf("Button_%d", i)
-			l.logEvent(models.EventLevelJoypad, key, val)
+			name, ok := ButtonNames[i]
+			if !ok {
+				name = fmt.Sprintf("Button%d", i)
+			}
+			l.logEvent(models.EventLevelJoypad, name, value)
 		}
 	}
 }
@@ -196,4 +203,31 @@ var keyNames = map[glfw.Key]string{
 	glfw.KeyRightAlt:     "RIGHT_ALT",
 	glfw.KeyTab:          "TAB",
 	glfw.KeyBackspace:    "BACKSPACE",
+}
+
+var AxisNames = map[int]string{
+	0: "LeftStickX",
+	1: "LeftStickY",
+	2: "RightStickX",
+	3: "RightStickY",
+	4: "LeftTrigger",
+	5: "RightTrigger",
+}
+
+var ButtonNames = map[int]string{
+	0:  "A",
+	1:  "B",
+	2:  "X",
+	3:  "Y",
+	4:  "LeftBumper",
+	5:  "RightBumper",
+	6:  "Back",
+	7:  "Start",
+	8:  "LeftStick",
+	9:  "RightStick",
+	10: "DpadUp",
+	11: "DpadRight",
+	12: "DpadDown",
+	13: "DpadLeft",
+	14: "Home",
 }
