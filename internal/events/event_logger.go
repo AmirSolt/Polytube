@@ -11,6 +11,11 @@ import (
 	"github.com/xitongsys/parquet-go/writer"
 )
 
+type EventLoggerInterface interface {
+	LogEvent(e models.Event) error
+	Close() error
+}
+
 type ParquetEventLogger struct {
 	mu     sync.Mutex
 	writer *writer.ParquetWriter

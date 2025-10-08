@@ -20,8 +20,8 @@ const ANALOG_THRESHOLD = 0.5 // 50% threshold for analog change
 
 // --- InputListener ---
 type InputListener struct {
-	EventLogger *events.ParquetEventLogger
-	Logger      *logger.Logger
+	EventLogger events.EventLoggerInterface
+	Logger      logger.LoggerInterface
 	lastStates  map[string]float64
 }
 

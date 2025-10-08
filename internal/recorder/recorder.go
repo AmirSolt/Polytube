@@ -46,7 +46,7 @@ type Recorder struct {
 	waitErr        error
 }
 
-// Start spawns ffmpeg.exe with DXGI screen capture bound to the target window title.
+// Start spawns ffmpeg.exe screen capture bound to the target window title.
 // It wires stdout/stderr to the internal logger. If FFmpeg cannot be started, returns error.
 //
 // Notes:

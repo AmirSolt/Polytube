@@ -17,6 +17,12 @@ import (
 	"sync"
 )
 
+type LoggerInterface interface {
+	Info(msg string)
+	Warn(msg string)
+	Error(msg string)
+}
+
 // Logger writes timestamped log lines to a file.
 type Logger struct {
 	File   *os.File

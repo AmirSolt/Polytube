@@ -25,8 +25,8 @@ import (
 
 // ConsoleListener reads stdin lines and logs them as events.
 type ConsoleListener struct {
-	EventLogger *events.ParquetEventLogger
-	Logger      *logger.Logger
+	EventLogger events.EventLoggerInterface
+	Logger      logger.LoggerInterface
 }
 
 // Start blocks and reads from stdin until the context is canceled.
