@@ -129,25 +129,32 @@ func parseFlags() *cliConfig {
 
 	fmt.Printf("[DEBUG] Parsed flags: %+v\n", cfg)
 
-	// Basic validation.
-	missing := []string{}
-	if cfg.Title == "" {
-		missing = append(missing, "--title")
-	}
-	if cfg.OutPath == "" {
-		missing = append(missing, "--out")
-	}
-	if cfg.Endpoint == "" {
-		missing = append(missing, "--endpoint")
-	}
-	if cfg.SessionID == "" {
-		cfg.SessionID = uuid.New().String()
+	var missing []string
+	if cfg.IsLoading {
+		if cfg.OutPath == "" {
+			missing = append(missing, "--out")
+		}
+	} else {
+		if cfg.OutPath == "" {
+			missing = append(missing, "--out")
+		}
+		if cfg.OutPath == "" {
+			missing = append(missing, "--out")
+		}
+		if cfg.Title == "" {
+			missing = append(missing, "--title")
+		}
 	}
 
-	if len(missing) > 0 && !cfg.IsLoading {
+	if len(missing) > 0 {
 		fmt.Fprintf(os.Stderr, "missing required flags: %v\n", missing)
 		flag.Usage()
 		os.Exit(2)
+	}
+
+	if cfg.SessionID == "" && !cfg.IsLoading {
+		cfg.SessionID = uuid.New().String()
+		fmt.Printf("Generated new session ID: %s\n", cfg.SessionID)
 	}
 
 	return cfg
