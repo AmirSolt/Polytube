@@ -11,74 +11,55 @@ import (
 	"github.com/xitongsys/parquet-go/writer"
 )
 
-// EventParquetRow defines the schema for each event in the parquet file.
-type EventParquetRow struct {
-	Timestamp  float64 `parquet:"name=timestamp, type=DOUBLE"`
-	EventType  string  `parquet:"name=eventType, type=BYTE_ARRAY, convertedtype=UTF8, encoding=PLAIN_DICTIONARY"`
-	EventLevel string  `parquet:"name=eventLevel, type=BYTE_ARRAY, convertedtype=UTF8, encoding=PLAIN_DICTIONARY"`
-	Content    string  `parquet:"name=content, type=BYTE_ARRAY, convertedtype=UTF8, encoding=PLAIN_DICTIONARY"`
-	Value      float64 `parquet:"name=value, type=DOUBLE"`
-}
-
-// ParquetEventLogger writes events to a Parquet file.
 type ParquetEventLogger struct {
 	mu     sync.Mutex
 	writer *writer.ParquetWriter
 }
 
-// NewParquetEventLogger creates a new Parquet writer with schema.
+// Create new parquet file writer
 func NewParquetEventLogger(path string) (*ParquetEventLogger, error) {
-	// Create file
 	fw, err := local.NewLocalFileWriter(path)
 	if err != nil {
 		return nil, fmt.Errorf("create parquet file: %w", err)
 	}
 
-	// Create parquet writer
-	pw, err := writer.NewParquetWriter(fw, new(EventParquetRow), 1)
+	pw, err := writer.NewParquetWriter(fw, new(models.Event), 4)
 	if err != nil {
 		return nil, fmt.Errorf("create parquet writer: %w", err)
 	}
 
-	// Optional: set compression codec
 	pw.CompressionType = parquet.CompressionCodec_SNAPPY
+	pw.RowGroupSize = 128 * 1024 * 1024 // 128MB
+	pw.PageSize = 8 * 1024              // 8KB
 
-	return &ParquetEventLogger{
-		writer: pw,
-	}, nil
+	return &ParquetEventLogger{writer: pw}, nil
 }
 
-// LogEvent appends one row to the parquet file.
 func (l *ParquetEventLogger) LogEvent(e models.Event) error {
 	l.mu.Lock()
 	defer l.mu.Unlock()
 
-	row := EventParquetRow{
+	row := models.Event{
 		Timestamp:  e.Timestamp,
 		EventType:  e.EventType,
 		EventLevel: e.EventLevel,
 		Content:    e.Content,
 		Value:      e.Value,
 	}
-
 	if err := l.writer.Write(row); err != nil {
 		return fmt.Errorf("parquet write: %w", err)
 	}
-
-	// Optional: Flush periodically if needed
-	if l.writer.RowGroupSize >= 1000 {
-		if err := l.writer.WriteStop(); err != nil {
-			return fmt.Errorf("flush parquet: %w", err)
-		}
-	}
-
 	return nil
 }
 
-// Close finalizes the file.
+// Close flushes and finalizes the file
 func (l *ParquetEventLogger) Close() error {
 	l.mu.Lock()
 	defer l.mu.Unlock()
+
+	if l.writer == nil {
+		return nil
+	}
 
 	if err := l.writer.WriteStop(); err != nil {
 		return fmt.Errorf("close parquet writer: %w", err)
@@ -88,5 +69,6 @@ func (l *ParquetEventLogger) Close() error {
 		return fmt.Errorf("close parquet file: %w", err)
 	}
 
+	l.writer = nil
 	return nil
 }
