@@ -43,13 +43,12 @@ func (l *InputListener) Start(ctx context.Context) {
 	defer glfw.Terminate()
 
 	// Create hidden window for keyboard/mouse input
-	glfw.WindowHint(glfw.Visible, glfw.True)
+	glfw.WindowHint(glfw.Visible, glfw.False)
 	window, err := glfw.CreateWindow(640, 480, "Input Listener", nil, nil)
 	if err != nil {
 		l.Logger.Warn(fmt.Sprintf("GLFW window creation failed: %v", err))
 		return
 	}
-	window.Focus()
 	window.MakeContextCurrent()
 
 	// Set callbacks
