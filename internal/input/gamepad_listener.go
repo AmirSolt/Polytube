@@ -15,8 +15,8 @@ import (
 	"github.com/go-gl/glfw/v3.3/glfw"
 )
 
-const POLL_INTERVAL_MS = 50
-const ANALOG_THRESHOLD = 0.5 // 50% threshold for analog change
+const POLL_INTERVAL_MS = 30
+const ANALOG_THRESHOLD = 0.1
 
 // --- InputListener ---
 type GamepadInputListener struct {
