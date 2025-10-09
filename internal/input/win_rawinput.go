@@ -1,19 +1,31 @@
 package input
 
 import (
+	"context"
 	"fmt"
 	"log"
+	"polytube/replay/internal/events"
+	"polytube/replay/internal/logger"
+	"polytube/replay/pkg/models"
+	"polytube/replay/utils"
 	"unsafe"
 
 	"github.com/gonutz/w32/v3"
 )
 
-func Start() {
+// // --- InputListener ---
+type InputListener struct {
+	EventLogger events.EventLoggerInterface
+	Logger      logger.LoggerInterface
+}
+
+func (l *InputListener) Start(ctx context.Context) {
 	log.SetFlags(0)
 
 	hInst, err := w32.GetModuleHandle(nil)
 	if err != nil {
-		log.Fatal("GetModuleHandle failed:", err)
+		l.Logger.Error(fmt.Sprintf("GetModuleHandle failed: %v", err))
+		return
 	}
 
 	// --- Keyboard hook (int32 in the signature!) ---
@@ -22,73 +34,110 @@ func Start() {
 			k := (*w32.KBDLLHOOKSTRUCT)(unsafe.Pointer(lParam)) // #nosec G103 safe Windows callback cast
 			switch wParam {
 			case w32.WM_KEYDOWN, w32.WM_SYSKEYDOWN:
-				log.Printf("[KEY DOWN] %s vk=0x%02X sc=0x%02X flags=0x%02X",
-					vkName(k.VkCode), k.VkCode, k.ScanCode, k.Flags)
+				// log.Printf("[KEY DOWN] %s vk=0x%02X sc=0x%02X flags=0x%02X",
+				// 	vkName(k.VkCode), k.VkCode, k.ScanCode, k.Flags)
+				l.logEvent(getDevice(k.VkCode), vkName(k.VkCode), 1)
 			case w32.WM_KEYUP, w32.WM_SYSKEYUP:
-				log.Printf("[KEY  UP ] %s vk=0x%02X sc=0x%02X flags=0x%02X",
-					vkName(k.VkCode), k.VkCode, k.ScanCode, k.Flags)
+				// log.Printf("[KEY  UP ] %s vk=0x%02X sc=0x%02X flags=0x%02X",
+				// 	vkName(k.VkCode), k.VkCode, k.ScanCode, k.Flags)
+				l.logEvent(getDevice(k.VkCode), vkName(k.VkCode), 0)
 			}
 		}
 		return w32.CallNextHookEx(0, code, wParam, lParam)
 	})
 	kbHook, err := w32.SetWindowsHookEx(w32.WH_KEYBOARD_LL, kbProc, hInst, 0)
 	if err != nil {
-		log.Fatal("SetWindowsHookEx(WH_KEYBOARD_LL) failed:", err)
+		l.Logger.Error(fmt.Sprintf("SetWindowsHookEx(WH_KEYBOARD_LL) failed: %v", err))
+		return
 	}
 	if kbHook == 0 {
-		log.Fatal("SetWindowsHookEx(WH_KEYBOARD_LL) failed")
+		l.Logger.Error("SetWindowsHookEx(WH_KEYBOARD_LL) failed")
+		return
 	}
 	defer w32.UnhookWindowsHookEx(kbHook)
 
 	// --- Mouse hook (int32 in the signature!) ---
 	msProc := w32.NewHookProcedure(func(code int32, wParam, lParam uintptr) uintptr {
 		if code >= 0 {
-			m := (*w32.MSLLHOOKSTRUCT)(unsafe.Pointer(lParam)) // #nosec G103 safe Windows callback cast
+			// m := (*w32.MSLLHOOKSTRUCT)(unsafe.Pointer(lParam)) // #nosec G103 safe Windows callback cast
 			switch wParam {
 			case w32.WM_LBUTTONDOWN:
-				log.Printf("[DOWN] %s x=%d y=%d", vkName(w32.WM_LBUTTONDOWN), m.Pt.X, m.Pt.Y)
+				l.logEvent(models.EventLevelMouse, vkName(w32.WM_LBUTTONDOWN), 1)
 			case w32.WM_LBUTTONUP:
-				log.Printf("[UP] %s x=%d y=%d", vkName(w32.WM_LBUTTONUP), m.Pt.X, m.Pt.Y)
+				l.logEvent(models.EventLevelMouse, vkName(w32.WM_LBUTTONUP), 0)
 			case w32.WM_RBUTTONDOWN:
-				log.Printf("[DOWN] %s x=%d y=%d", vkName(w32.WM_RBUTTONDOWN), m.Pt.X, m.Pt.Y)
+				l.logEvent(models.EventLevelMouse, vkName(w32.WM_RBUTTONDOWN), 1)
 			case w32.WM_RBUTTONUP:
-				log.Printf("[UP] %s x=%d y=%d", vkName(w32.WM_RBUTTONUP), m.Pt.X, m.Pt.Y)
+				l.logEvent(models.EventLevelMouse, vkName(w32.WM_RBUTTONUP), 0)
 			case w32.WM_MBUTTONDOWN:
-				log.Printf("[DOWN] %s x=%d y=%d", vkName(w32.WM_MBUTTONDOWN), m.Pt.X, m.Pt.Y)
+				l.logEvent(models.EventLevelMouse, vkName(w32.WM_MBUTTONDOWN), 1)
 			case w32.WM_MBUTTONUP:
-				log.Printf("[UP] %s x=%d y=%d", vkName(w32.WM_MBUTTONUP), m.Pt.X, m.Pt.Y)
-			case w32.WM_MOUSEWHEEL:
-				delta := int16((m.MouseData >> 16) & 0xFFFF)
-				log.Printf("[MOUSE] WHEEL %+d x=%d y=%d", delta, m.Pt.X, m.Pt.Y)
+				l.logEvent(models.EventLevelMouse, vkName(w32.WM_MBUTTONUP), 0)
+				// case w32.WM_MOUSEWHEEL:
+				// delta := int16((m.MouseData >> 16) & 0xFFFF)
+				// log.Printf("[MOUSE] WHEEL %+d x=%d y=%d", delta, m.Pt.X, m.Pt.Y)
 			}
 		}
 		return w32.CallNextHookEx(0, code, wParam, lParam)
 	})
 	msHook, err := w32.SetWindowsHookEx(w32.WH_MOUSE_LL, msProc, hInst, 0)
 	if err != nil {
-		log.Fatal("SetWindowsHookEx(WH_MOUSE_LL) failed:", err)
+		l.Logger.Error(fmt.Sprintf("SetWindowsHookEx(WH_MOUSE_LL) failed: %v", err))
+		return
 	}
 	if msHook == 0 {
-		log.Fatal("SetWindowsHookEx(WH_MOUSE_LL) failed")
+		l.Logger.Error("SetWindowsHookEx(WH_MOUSE_LL) failed")
+		return
 	}
 	defer w32.UnhookWindowsHookEx(msHook)
 
-	// --- Message loop (needed to keep hooks alive) ---
-	var msg w32.MSG
-	for {
-		ret, err := w32.GetMessage(&msg, 0, 0, 0)
-		if err != nil {
-			log.Fatal("GetMessage failed:", err)
+	// --- Message loop ---
+	done := make(chan struct{})
+	go func() {
+		var msg w32.MSG
+		for {
+			ret, err := w32.GetMessage(&msg, 0, 0, 0)
+			if err != nil {
+				l.Logger.Error(fmt.Sprintf("GetMessage failed: %v", err))
+				break
+			}
+			if !ret {
+				break
+			}
+			w32.TranslateMessage(&msg)
+			w32.DispatchMessage(&msg)
 		}
-		if !ret {
-			break
-		}
-		w32.TranslateMessage(&msg)
-		w32.DispatchMessage(&msg)
+		close(done)
+	}()
+
+	// --- Wait for context cancellation ---
+	select {
+	case <-ctx.Done():
+		l.Logger.Info("InputListener: stopping (context canceled)")
+		w32.PostQuitMessage(0) // gracefully end message loop
+	case <-done:
+		l.Logger.Info("InputListener: message loop ended")
 	}
 }
 
-var VKNames = map[uint32]string{
+// --- Deduplicated logging with thresholds ---
+func (l *InputListener) logEvent(level models.EventLevel, key string, value float64) {
+	if key == "" {
+		return
+	}
+	event := models.Event{
+		Timestamp:  utils.NowEpochSeconds(),
+		EventType:  models.EventTypeInputLog.String(),
+		EventLevel: level.String(),
+		Content:    key,
+		Value:      value,
+	}
+	if err := l.EventLogger.LogEvent(event); err != nil {
+		l.Logger.Warn(fmt.Sprintf("input listener: failed to log event: %v", err))
+	}
+}
+
+var VKKbNames = map[uint32]string{
 	// --- Control keys ---
 	0x08: "VK_BACK",
 	0x09: "VK_TAB",
@@ -165,7 +214,8 @@ var VKNames = map[uint32]string{
 	0x79: "VK_F10",
 	0x7A: "VK_F11",
 	0x7B: "VK_F12",
-
+}
+var VKMouseNames = map[uint32]string{
 	// --- Mouse buttons ---
 	w32.WM_LBUTTONDOWN: "VK_LBUTTON",
 	w32.WM_LBUTTONUP:   "VK_LBUTTON",
@@ -175,7 +225,8 @@ var VKNames = map[uint32]string{
 	w32.WM_MBUTTONUP:   "VK_MBUTTON",
 	w32.WM_XBUTTONDOWN: "VK_XBUTTON",
 	w32.WM_XBUTTONUP:   "VK_XBUTTON",
-
+}
+var VKGamepadNames = map[uint32]string{
 	// Alphabet buttons
 	0xC3: "VK_GAMEPAD_A",
 	0xC4: "VK_GAMEPAD_B",
@@ -212,8 +263,27 @@ var VKNames = map[uint32]string{
 }
 
 func vkName(vk uint32) string {
-	if name, ok := VKNames[vk]; ok {
+	if name, ok := VKKbNames[vk]; ok {
+		return name
+	}
+	if name, ok := VKMouseNames[vk]; ok {
+		return name
+	}
+	if name, ok := VKGamepadNames[vk]; ok {
 		return name
 	}
 	return fmt.Sprintf("0x%02X", vk)
+}
+
+func getDevice(vk uint32) models.EventLevel {
+	if _, ok := VKKbNames[vk]; ok {
+		return models.EventLevelKeyboard
+	}
+	if _, ok := VKMouseNames[vk]; ok {
+		return models.EventLevelMouse
+	}
+	if _, ok := VKGamepadNames[vk]; ok {
+		return models.EventLevelJoypad
+	}
+	return models.EventLevelJoypad
 }
