@@ -44,14 +44,15 @@ type cliConfig struct {
 
 // serviceBundle groups all running components so main can manage their lifecycle.
 type serviceBundle struct {
-	ctx             context.Context
-	cancel          context.CancelFunc
-	rec             *recorder.Recorder
-	upl             *uploader.Uploader
-	eventLogger     *events.ParquetEventLogger
-	internalLogger  *logger.Logger
-	inputListener   *input.InputListener
-	consoleListener *console.ConsoleListener
+	ctx                  context.Context
+	cancel               context.CancelFunc
+	rec                  *recorder.Recorder
+	upl                  *uploader.Uploader
+	eventLogger          *events.ParquetEventLogger
+	internalLogger       *logger.Logger
+	mnkInputListener     *input.MNKInputListener
+	gamepadInputListener *input.GamepadInputListener
+	consoleListener      *console.ConsoleListener
 }
 
 // main parses flags, starts services, waits for FFmpeg to exit, and runs shutdown.
@@ -208,13 +209,24 @@ func startServices(cfg *cliConfig, dataDir, internalLogPath, eventsPath string, 
 	ctx, cancel := context.WithCancel(context.Background())
 
 	// Input listener (keyboard/mouse/etc.).
-	inp := &input.InputListener{
+	mnkInputListener := &input.MNKInputListener{
 		EventLogger: evLog,
 		Logger:      intLog,
 	}
 	go func() {
 		intLog.Info("Input listener starting")
-		inp.Start(ctx)
+		mnkInputListener.Start(ctx)
+		intLog.Info("Input listener stopped")
+	}()
+
+	// Gamepad input listener.
+	ginp := &input.GamepadInputListener{
+		EventLogger: evLog,
+		Logger:      intLog,
+	}
+	go func() {
+		intLog.Info("Input listener starting")
+		ginp.Start(ctx)
 		intLog.Info("Input listener stopped")
 	}()
 
@@ -246,14 +258,15 @@ func startServices(cfg *cliConfig, dataDir, internalLogPath, eventsPath string, 
 	}(cfg.PollSeconds)
 
 	return &serviceBundle{
-		ctx:             ctx,
-		cancel:          cancel,
-		rec:             rec,
-		upl:             upl,
-		eventLogger:     evLog,
-		internalLogger:  intLog,
-		inputListener:   inp,
-		consoleListener: con,
+		ctx:                  ctx,
+		cancel:               cancel,
+		rec:                  rec,
+		upl:                  upl,
+		eventLogger:          evLog,
+		internalLogger:       intLog,
+		mnkInputListener:     mnkInputListener,
+		gamepadInputListener: ginp,
+		consoleListener:      con,
 	}, nil
 }
 

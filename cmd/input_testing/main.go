@@ -15,14 +15,25 @@ func main() {
 	evLog := &events.MockEventLogger{}
 
 	// Input listener (keyboard/mouse/etc.).
-	inp := &input.InputListener{
+	mnkinp := &input.MNKInputListener{
+		EventLogger: evLog,
+		Logger:      intLog,
+	}
+
+	ginp := &input.GamepadInputListener{
 		EventLogger: evLog,
 		Logger:      intLog,
 	}
 	go func() {
 
 		intLog.Info("Input listener starting")
-		inp.Start(ctx)
+		mnkinp.Start(ctx)
+		intLog.Info("Input listener stopped")
+	}()
+
+	go func() {
+		intLog.Info("Input listener starting")
+		ginp.Start(ctx)
 		intLog.Info("Input listener stopped")
 	}()
 

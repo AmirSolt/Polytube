@@ -29,6 +29,7 @@ const (
 	EventLevelMouse
 	EventLevelKeyboard
 	EventLevelJoypad
+	EventLevelUknownDevice
 )
 
 func (e EventLevel) String() string {
@@ -45,6 +46,8 @@ func (e EventLevel) String() string {
 		return "KEYBOARD"
 	case EventLevelJoypad:
 		return "JOYPAD"
+	case EventLevelUknownDevice:
+		return "UNKNOWN_DEVICE"
 	default:
 		return "UNKNOWN"
 	}

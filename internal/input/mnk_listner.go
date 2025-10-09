@@ -14,12 +14,12 @@ import (
 )
 
 // // --- InputListener ---
-type InputListener struct {
+type MNKInputListener struct {
 	EventLogger events.EventLoggerInterface
 	Logger      logger.LoggerInterface
 }
 
-func (l *InputListener) Start(ctx context.Context) {
+func (l *MNKInputListener) Start(ctx context.Context) {
 	log.SetFlags(0)
 
 	hInst, err := w32.GetModuleHandle(nil)
@@ -121,7 +121,7 @@ func (l *InputListener) Start(ctx context.Context) {
 }
 
 // --- Deduplicated logging with thresholds ---
-func (l *InputListener) logEvent(level models.EventLevel, key string, value float64) {
+func (l *MNKInputListener) logEvent(level models.EventLevel, key string, value float64) {
 	if key == "" {
 		return
 	}
@@ -226,41 +226,42 @@ var VKMouseNames = map[uint32]string{
 	w32.WM_XBUTTONDOWN: "VK_XBUTTON",
 	w32.WM_XBUTTONUP:   "VK_XBUTTON",
 }
-var VKGamepadNames = map[uint32]string{
-	// Alphabet buttons
-	0xC3: "VK_GAMEPAD_A",
-	0xC4: "VK_GAMEPAD_B",
-	0xC5: "VK_GAMEPAD_X",
-	0xC6: "VK_GAMEPAD_Y",
 
-	// shoulder and triggers
-	0xC7: "VK_GAMEPAD_RIGHT_SHOULDER",
-	0xC8: "VK_GAMEPAD_LEFT_SHOULDER",
-	0xC9: "VK_GAMEPAD_LEFT_TRIGGER",
-	0xCA: "VK_GAMEPAD_RIGHT_TRIGGER",
+// var VKGamepadNames = map[uint32]string{
+// 	// Alphabet buttons
+// 	0xC3: "VK_GAMEPAD_A",
+// 	0xC4: "VK_GAMEPAD_B",
+// 	0xC5: "VK_GAMEPAD_X",
+// 	0xC6: "VK_GAMEPAD_Y",
 
-	// Dpad
-	0xCB: "VK_GAMEPAD_DPAD_UP",
-	0xCC: "VK_GAMEPAD_DPAD_DOWN",
-	0xCD: "VK_GAMEPAD_DPAD_LEFT",
-	0xCE: "VK_GAMEPAD_DPAD_RIGHT",
+// 	// shoulder and triggers
+// 	0xC7: "VK_GAMEPAD_RIGHT_SHOULDER",
+// 	0xC8: "VK_GAMEPAD_LEFT_SHOULDER",
+// 	0xC9: "VK_GAMEPAD_LEFT_TRIGGER",
+// 	0xCA: "VK_GAMEPAD_RIGHT_TRIGGER",
 
-	// Center buttons
-	0xCF: "VK_GAMEPAD_MENU", // Start
-	0xD0: "VK_GAMEPAD_VIEW", // Back
+// 	// Dpad
+// 	0xCB: "VK_GAMEPAD_DPAD_UP",
+// 	0xCC: "VK_GAMEPAD_DPAD_DOWN",
+// 	0xCD: "VK_GAMEPAD_DPAD_LEFT",
+// 	0xCE: "VK_GAMEPAD_DPAD_RIGHT",
 
-	// left stick
-	0xD3: "VK_GAMEPAD_LEFT_STICK_UP", // Press
-	0xD4: "VK_GAMEPAD_LEFT_STICK_DOWN",
-	0xD5: "VK_GAMEPAD_LEFT_STICK_LEFT",
-	0xD6: "VK_GAMEPAD_LEFT_STICK_RIGHT",
+// 	// Center buttons
+// 	0xCF: "VK_GAMEPAD_MENU", // Start
+// 	0xD0: "VK_GAMEPAD_VIEW", // Back
 
-	// Right stick
-	0xD7: "VK_GAMEPAD_RIGHT_STICK_UP",
-	0xD8: "VK_GAMEPAD_RIGHT_STICK_DOWN",
-	0xD9: "VK_GAMEPAD_RIGHT_STICK_RIGHT",
-	0xDA: "VK_GAMEPAD_RIGHT_STICK_LEFT",
-}
+// 	// left stick
+// 	0xD3: "VK_GAMEPAD_LEFT_STICK_UP", // Press
+// 	0xD4: "VK_GAMEPAD_LEFT_STICK_DOWN",
+// 	0xD5: "VK_GAMEPAD_LEFT_STICK_LEFT",
+// 	0xD6: "VK_GAMEPAD_LEFT_STICK_RIGHT",
+
+// 	// Right stick
+// 	0xD7: "VK_GAMEPAD_RIGHT_STICK_UP",
+// 	0xD8: "VK_GAMEPAD_RIGHT_STICK_DOWN",
+// 	0xD9: "VK_GAMEPAD_RIGHT_STICK_RIGHT",
+// 	0xDA: "VK_GAMEPAD_RIGHT_STICK_LEFT",
+// }
 
 func vkName(vk uint32) string {
 	if name, ok := VKKbNames[vk]; ok {
@@ -269,9 +270,9 @@ func vkName(vk uint32) string {
 	if name, ok := VKMouseNames[vk]; ok {
 		return name
 	}
-	if name, ok := VKGamepadNames[vk]; ok {
-		return name
-	}
+	// if name, ok := VKGamepadNames[vk]; ok {
+	// 	return name
+	// }
 	return fmt.Sprintf("0x%02X", vk)
 }
 
@@ -282,8 +283,8 @@ func getDevice(vk uint32) models.EventLevel {
 	if _, ok := VKMouseNames[vk]; ok {
 		return models.EventLevelMouse
 	}
-	if _, ok := VKGamepadNames[vk]; ok {
-		return models.EventLevelJoypad
-	}
-	return models.EventLevelJoypad
+	// if _, ok := VKGamepadNames[vk]; ok {
+	// 	return models.EventLevelJoypad
+	// }
+	return models.EventLevelUknownDevice
 }
