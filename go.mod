@@ -4,6 +4,7 @@ go 1.25.1
 
 require (
 	github.com/go-gl/glfw/v3.3/glfw v0.0.0-20250301202403-da16c1255728
+	github.com/gonutz/w32/v3 v3.0.0-beta9
 	github.com/google/uuid v1.6.0
 	github.com/xitongsys/parquet-go v1.6.2
 	github.com/xitongsys/parquet-go-source v0.0.0-20241021075129-b732d2ac9c9b
