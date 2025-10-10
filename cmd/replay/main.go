@@ -207,10 +207,11 @@ func startServices(cfg *cliConfig, dataDir, internalLogPath, eventsPath string, 
 
 	// Recorder configured to write HLS into dataDir and log FFmpeg output to internal logger.
 	rec := &recorder.Recorder{
-		Title:      cfg.Title,
-		DirPath:    dataDir,
-		FFmpegPath: ffmpegPath,
-		Logger:     intLog,
+		Title:       cfg.Title,
+		DirPath:     dataDir,
+		FFmpegPath:  ffmpegPath,
+		Logger:      intLog,
+		EventLogger: evLog,
 	}
 
 	// Uploader: maintains in-memory set of uploaded files; logs into internal logger.
