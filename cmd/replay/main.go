@@ -102,12 +102,15 @@ func main() {
 		_ = shutdown(svcs) // attempt cleanup anyway
 		os.Exit(1)
 	}
+
+	// Log event
 	if err := svcs.rec.LogRecordingStartedEvent(); err != nil {
 		svcs.internalLogger.Error(fmt.Sprintf("Failed to log RECORDING_STARTED event. Have to exit.: %v", err))
 		_ = shutdown(svcs) // attempt cleanup anyway
 		os.Exit(1)
 	}
 	svcs.internalLogger.Info("FFmpeg started; waiting for process to exit...")
+
 	if err := svcs.rec.Wait(); err != nil {
 		svcs.internalLogger.Warn(fmt.Sprintf("FFmpeg exited with error: %v", err))
 	} else {
