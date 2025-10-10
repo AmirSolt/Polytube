@@ -20,13 +20,16 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/url"
 	"os"
 	"path/filepath"
 	"strings"
 	"sync"
 	"time"
 
+	"polytube/replay/internal/info"
 	"polytube/replay/internal/logger"
+	"polytube/replay/pkg/models"
 )
 
 // Uploader manages background and shutdown uploads.
@@ -42,6 +45,7 @@ type Uploader struct {
 	WG                  sync.WaitGroup  // tracks concurrent uploads
 	Logger              *logger.Logger  // internal logger
 	InternalLogFilePath string
+	SessionInfo         info.SessionInfo
 }
 
 // UploadTS scans DirPath for .ts files and uploads any that aren't yet uploaded.
@@ -157,12 +161,13 @@ func (u *Uploader) uploadFile(path string) {
 
 // getSignedURL sends a GET request to retrieve a signed URL for uploading the given file.
 func (u *Uploader) getSignedURL(fileName string) (string, error) {
-	url := fmt.Sprintf("%s/%s/%s/%s/%s",
+	url := fmt.Sprintf("%s/%s/%s/%s/%s?%s",
 		strings.TrimSuffix(u.EndpointURL, "/"),
 		u.ApiID,     // maps to params.user_id
 		u.SessionID, // maps to params.session_id
 		fileName,    // maps to params.file_name
 		"put",
+		EncodeSearchParams(u.SessionInfo.ToSearchParams()),
 	)
 
 	u.Logger.Info(fmt.Sprintf("uploader: requesting signed URL for %s -> %s", fileName, url))
@@ -253,54 +258,17 @@ func isStable(path string) bool {
 	return age > 2*time.Second
 }
 
-// ===================================================
+// EncodeSearchParams builds a query string like "?gpu_brand=string string&tag=blue&tag=red"
+func EncodeSearchParams(params []models.SearchParam) string {
+	if len(params) == 0 {
+		return ""
+	}
 
-// uploadFile sends the file via HTTP PUT to EndpointURL/<fileName>.
-// func (u *Uploader) uploadFileDeprecated(path string) {
-// 	defer u.WG.Done()
+	values := url.Values{}
+	for _, p := range params {
+		// Use Add instead of Set to allow repeated keys (for tags)
+		values.Add(p.Key, p.Value)
+	}
 
-// 	fileName := filepath.Base(path)
-// 	url := fmt.Sprintf("%s/%s/%s/%s",
-// 		strings.TrimSuffix(u.EndpointURL, "/"),
-// 		u.ApiID,     // maps to params.user_id
-// 		u.SessionID, // maps to params.session_id
-// 		fileName,    // maps to params.file_name
-// 	)
-
-// 	u.Logger.Info(fmt.Sprintf("uploader: uploading %s -> %s", fileName, url))
-
-// 	file, err := os.Open(path)
-// 	if err != nil {
-// 		u.Logger.Warn(fmt.Sprintf("uploader: open %s failed: %v", path, err))
-// 		return
-// 	}
-// 	defer file.Close()
-
-// 	req, err := http.NewRequest(http.MethodPut, url, file)
-// 	if err != nil {
-// 		u.Logger.Warn(fmt.Sprintf("uploader: request %s failed: %v", fileName, err))
-// 		return
-// 	}
-
-// 	// ✅ Set correct headers expected by the server
-// 	req.Header.Set("secret-key", u.ApiKey) // matches server
-// 	req.Header.Set("Content-Type", "application/octet-stream")
-
-// 	client := u.client()
-// 	resp, err := client.Do(req)
-// 	if err != nil {
-// 		u.Logger.Warn(fmt.Sprintf("uploader: http error for %s: %v", fileName, err))
-// 		return
-// 	}
-// 	defer resp.Body.Close()
-
-// 	body, _ := io.ReadAll(resp.Body)
-
-// 	if resp.StatusCode >= 200 && resp.StatusCode < 300 {
-// 		u.markUploaded(path)
-// 		u.Logger.Info(fmt.Sprintf("uploader: %s uploaded successfully! (status %d)", fileName, resp.StatusCode))
-// 	} else {
-// 		u.Logger.Error(fmt.Sprintf("uploader: upload failed: %s (status %d, response: %s)",
-// 			fileName, resp.StatusCode, string(body)))
-// 	}
-// }
+	return values.Encode()
+}

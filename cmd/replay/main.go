@@ -20,6 +20,7 @@ import (
 
 	"polytube/replay/internal/console"
 	"polytube/replay/internal/events"
+	"polytube/replay/internal/info"
 	"polytube/replay/internal/input"
 	"polytube/replay/internal/logger"
 	"polytube/replay/internal/recorder"
@@ -40,6 +41,9 @@ type cliConfig struct {
 	SessionID   string
 	PollSeconds int
 	IsLoading   bool
+	Tags        string
+	AppName     string
+	AppVersion  string
 }
 
 // serviceBundle groups all running components so main can manage their lifecycle.
@@ -125,6 +129,9 @@ func parseFlags() *cliConfig {
 	flag.StringVar(&cfg.ApiID, "api-id", "", "API ID header value")
 	flag.StringVar(&cfg.ApiKey, "api-key", "", "API Key header value")
 	flag.StringVar(&cfg.SessionID, "session-id", "", "Session id.")
+	flag.StringVar(&cfg.Tags, "tags", "", "Comma-separated list of tags.")
+	flag.StringVar(&cfg.AppName, "app-name", "<Unassigned>", "The app/game name.")
+	flag.StringVar(&cfg.AppVersion, "app-version", "<Unassigned>", "The current app version. Use '1.0.0' versioning.")
 	flag.IntVar(&cfg.PollSeconds, "poll", defaultPollSeconds, "Uploader poll interval in seconds")
 	flag.Parse()
 
@@ -164,6 +171,9 @@ func parseFlags() *cliConfig {
 // startServices initializes loggers, recorder, uploader, and background listeners/poller.
 // It returns a service bundle with a cancellable context controlling all background work.
 func startServices(cfg *cliConfig, dataDir, internalLogPath, eventsPath string, ffmpegPath string) (*serviceBundle, error) {
+	sessionInfo := info.SessionInfo{}
+	sessionInfo.PopulateInfo(cfg.AppName, cfg.AppVersion, cfg.Tags)
+
 	// Internal logger first: everything else can log into it.
 	intLog, err := logger.NewLogger(internalLogPath)
 	if err != nil {
@@ -202,6 +212,7 @@ func startServices(cfg *cliConfig, dataDir, internalLogPath, eventsPath string, 
 		UploadedFiles:       make(map[string]bool),
 		Logger:              intLog,
 		InternalLogFilePath: internalLogPath,
+		SessionInfo:         sessionInfo,
 	}
 	intLog.Info("Uploader initialized")
 
