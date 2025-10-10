@@ -63,7 +63,8 @@ type SessionInfo struct {
 	Country    *string `json:"country" db:"country"`
 	DeviceType *string `json:"device_type" db:"device_type"`
 	GPUModel   *string `json:"gpu_model" db:"gpu_model"`
-	GPUBrand   *string `json:"gpu_brand" db:"gpu_brand"`
+	GPUDriver  *string `json:"gpu_driver" db:"gpu_driver"`
+	GPUVendor  *string `json:"gpu_vendor" db:"gpu_vendor"`
 	OS         *string `json:"os" db:"os"`
 
 	Logger logger.LoggerInterface
@@ -77,8 +78,9 @@ func (d *SessionInfo) PopulateDeviceInfo() error {
 
 	primGpu := d.getPrimaryGPU()
 	if primGpu != nil {
-		d.GPUModel = getModelStr(primGpu)
-		d.GPUBrand = &primGpu.DeviceInfo.Vendor.Name
+		d.GPUModel = &primGpu.DeviceInfo.Product.Name
+		d.GPUDriver = &primGpu.DeviceInfo.Driver
+		d.GPUVendor = &primGpu.DeviceInfo.Vendor.Name
 	}
 	return nil
 }
@@ -107,7 +109,8 @@ func (s *SessionInfo) ToSearchParams() []models.SearchParam {
 	add("country", s.Country)
 	add("device_type", s.DeviceType)
 	add("gpu_model", s.GPUModel)
-	add("gpu_brand", s.GPUBrand)
+	add("gpu_driver", s.GPUDriver)
+	add("gpu_vendor", s.GPUVendor)
 	add("os", s.OS)
 
 	// Handle tags specially — multiple entries: tag=blue,tag=red
@@ -227,10 +230,4 @@ func getCountry() *string {
 
 	country := syscall.UTF16ToString(buf)
 	return &country
-}
-
-// getModel formats a human-readable GPU description
-func getModelStr(gpu *gpu.GraphicsCard) *string {
-	str := fmt.Sprintf("%s %s", gpu.DeviceInfo.Product.Name, gpu.DeviceInfo.Driver)
-	return &str
 }
