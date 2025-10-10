@@ -77,10 +77,10 @@ recorder.exe --out "C:\Recordings\MySession"
 **Description:**
 Specifies the upload endpoint for cloud storage. 
 **Details:**
-* Currently it only works with [polytube.io](https://www.polytube.io) cloud storage.
+* Currently it only works with [polytube.io](https://polytube.io) cloud storage.
 
 **Default:**
-`https://www.polytube.io/api/sign`
+`https://polytube.io/api/sign`
 **Example:**
 
 ```bash
@@ -94,7 +94,7 @@ recorder.exe --endpoint "https://api.mydomain.com/upload"
 **Description:**
 Sets the API ID used for authentication when communicating with the upload endpoint.
 **Details:**
-* Currently it only works with [polytube.io](https://www.polytube.io) cloud storage.
+* Currently it only works with [polytube.io](https://polytube.io) cloud storage.
 **Example:**
 
 ```bash
@@ -108,7 +108,7 @@ recorder.exe --api-id "user_12345"
 **Description:**
 Sets the API key used for authentication with the upload endpoint.
 **Details:**
-* Currently it only works with [polytube.io](https://www.polytube.io) cloud storage.
+* Currently it only works with [polytube.io](https://polytube.io) cloud storage.
 **Example:**
 
 ```bash
