@@ -57,7 +57,7 @@ func (u *Uploader) UploadTS() {
 		u.Logger.Warn("uploader: no DirPath configured")
 		return
 	}
-	u.Logger.Info("uploader: scanning for .ts files")
+	// u.Logger.Info("uploader: scanning for .ts files")
 
 	if u.ApiID == "" || u.ApiKey == "" {
 		u.Logger.Error(fmt.Sprintf("Failed to upload: Api-ID or Api-Key are empty! Api-ID: %s, Api-Key: %s", u.ApiID, u.ApiKey))
