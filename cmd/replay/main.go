@@ -98,14 +98,14 @@ func main() {
 
 	// Record and block until FFmpeg exits (i.e., the game window closes).
 	if err := svcs.rec.Start(); err != nil {
-		svcs.internalLogger.Error(fmt.Sprintf("recorder start failed: %v", err))
+		svcs.internalLogger.Error(fmt.Errorf("recorder start failed: %w", err).Error())
 		_ = shutdown(svcs) // attempt cleanup anyway
 		os.Exit(1)
 	}
 
 	// Log event
 	if err := svcs.rec.LogRecordingStartedEvent(); err != nil {
-		svcs.internalLogger.Error(fmt.Sprintf("Failed to log RECORDING_STARTED event. Have to exit.: %v", err))
+		svcs.internalLogger.Error(fmt.Errorf("Failed to log RECORDING_STARTED event. Have to exit.: %w", err).Error())
 		_ = shutdown(svcs) // attempt cleanup anyway
 		os.Exit(1)
 	}
@@ -316,7 +316,7 @@ func shutdown(svcs *serviceBundle) error {
 	if err := svcs.eventLogger.Close(); err != nil {
 		catch(fmt.Errorf("close event logger: %w", err))
 		if svcs.internalLogger != nil {
-			svcs.internalLogger.Error(fmt.Sprintf("close event logger failed: %v", err))
+			svcs.internalLogger.Error(fmt.Errorf("close event logger failed: %w", err).Error())
 		}
 	} else if svcs.internalLogger != nil {
 		svcs.internalLogger.Info("Event logger closed")

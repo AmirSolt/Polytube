@@ -24,7 +24,7 @@ func (l *MNKInputListener) Start(ctx context.Context) {
 
 	hInst, err := w32.GetModuleHandle(nil)
 	if err != nil {
-		l.Logger.Error(fmt.Sprintf("GetModuleHandle failed: %v", err))
+		l.Logger.Error(fmt.Errorf("GetModuleHandle failed: %w", err).Error())
 		return
 	}
 
@@ -47,7 +47,7 @@ func (l *MNKInputListener) Start(ctx context.Context) {
 	})
 	kbHook, err := w32.SetWindowsHookEx(w32.WH_KEYBOARD_LL, kbProc, hInst, 0)
 	if err != nil {
-		l.Logger.Error(fmt.Sprintf("SetWindowsHookEx(WH_KEYBOARD_LL) failed: %v", err))
+		l.Logger.Error(fmt.Errorf("SetWindowsHookEx(WH_KEYBOARD_LL) failed: %w", err).Error())
 		return
 	}
 	if kbHook == 0 {
@@ -82,7 +82,7 @@ func (l *MNKInputListener) Start(ctx context.Context) {
 	})
 	msHook, err := w32.SetWindowsHookEx(w32.WH_MOUSE_LL, msProc, hInst, 0)
 	if err != nil {
-		l.Logger.Error(fmt.Sprintf("SetWindowsHookEx(WH_MOUSE_LL) failed: %v", err))
+		l.Logger.Error(fmt.Errorf("SetWindowsHookEx(WH_MOUSE_LL) failed: %w", err).Error())
 		return
 	}
 	if msHook == 0 {
@@ -98,7 +98,7 @@ func (l *MNKInputListener) Start(ctx context.Context) {
 		for {
 			ret, err := w32.GetMessage(&msg, 0, 0, 0)
 			if err != nil {
-				l.Logger.Error(fmt.Sprintf("GetMessage failed: %v", err))
+				l.Logger.Error(fmt.Errorf("GetMessage failed: %w", err).Error())
 				break
 			}
 			if !ret {

@@ -30,6 +30,7 @@ import (
 	"polytube/replay/internal/info"
 	"polytube/replay/internal/logger"
 	"polytube/replay/pkg/models"
+	"polytube/replay/utils"
 )
 
 // Uploader manages background and shutdown uploads.
@@ -60,7 +61,7 @@ func (u *Uploader) UploadTS() {
 	// u.Logger.Info("uploader: scanning for .ts files")
 
 	if u.ApiID == "" || u.ApiKey == "" {
-		u.Logger.Error(fmt.Sprintf("Failed to upload: Api-ID or Api-Key are empty! Api-ID: %s, Api-Key: %s", u.ApiID, u.ApiKey))
+		u.Logger.Error(fmt.Errorf("failed to upload: Api-ID or Api-Key are empty! Api-ID: %s, Api-Key: %s", u.ApiID, u.ApiKey).Error())
 		return
 	}
 	filepath.WalkDir(u.DirPath, func(path string, d os.DirEntry, err error) error {
@@ -94,7 +95,7 @@ func (u *Uploader) UploadRemaining() {
 
 	u.Logger.Info("uploader: uploading remaining files (excluding internal log)")
 	if u.ApiID == "" || u.ApiKey == "" {
-		u.Logger.Error(fmt.Sprintf("Failed to upload: Api-ID or Api-Key are empty! Api-ID: %s, Api-Key: %s", u.ApiID, u.ApiKey))
+		u.Logger.Error(fmt.Errorf("failed to upload: Api-ID or Api-Key are empty! Api-ID: %s, Api-Key: %s", u.ApiID, u.ApiKey).Error())
 		return
 	}
 	filepath.WalkDir(u.DirPath, func(path string, d os.DirEntry, err error) error {
@@ -132,7 +133,7 @@ func (u *Uploader) UploadLogFile() {
 	path := u.InternalLogFilePath
 	u.Logger.Info(fmt.Sprintf("uploader: scheduling internal log upload %s", path))
 	if u.ApiID == "" || u.ApiKey == "" {
-		u.Logger.Error(fmt.Sprintf("Failed to upload: Api-ID or Api-Key are empty! Api-ID: %s, Api-Key: %s", u.ApiID, u.ApiKey))
+		u.Logger.Error(fmt.Errorf("failed to upload: Api-ID or Api-Key are empty! Api-ID: %s, Api-Key: %s", u.ApiID, u.ApiKey).Error())
 		return
 	}
 	u.WG.Add(1)
@@ -145,14 +146,14 @@ func (u *Uploader) uploadFile(path string) {
 
 	fileName := filepath.Base(path)
 
-	signedURL, err := u.getSignedURL(fileName)
+	signedURL, err := u.getSignedURL(path)
 	if err != nil {
-		u.Logger.Error(fmt.Sprintf("uploader: failed to get signed URL for %s: %v", fileName, err))
+		u.Logger.Error(fmt.Errorf("uploader: failed to get signed URL for %s: %w", fileName, err).Error())
 		return
 	}
 
 	if err := u.putFileToSignedURL(signedURL, path); err != nil {
-		u.Logger.Error(fmt.Sprintf("uploader: failed to upload %s: %v", fileName, err))
+		u.Logger.Error(fmt.Errorf("uploader: failed to upload %s: %w", fileName, err).Error())
 		return
 	}
 
@@ -160,14 +161,27 @@ func (u *Uploader) uploadFile(path string) {
 }
 
 // getSignedURL sends a GET request to retrieve a signed URL for uploading the given file.
-func (u *Uploader) getSignedURL(fileName string) (string, error) {
+func (u *Uploader) getSignedURL(path string) (string, error) {
+	fileName := filepath.Base(path)
+	sizeMB, err := utils.GetFileSizeMB(path)
+	if err != nil {
+		u.Logger.Error(fmt.Errorf("could not get : %w", err).Error())
+		sizeMB = 0
+	}
+
+	params := u.SessionInfo.ToSearchParams()
+	params = append(params, models.SearchParam{
+		Key:   "size_mb",
+		Value: fmt.Sprintf("%.2f", sizeMB),
+	})
+
 	url := fmt.Sprintf("%s/%s/%s/%s/%s?%s",
 		strings.TrimSuffix(u.EndpointURL, "/"),
 		u.ApiID,     // maps to params.user_id
 		u.SessionID, // maps to params.session_id
 		fileName,    // maps to params.file_name
 		"put",
-		EncodeSearchParams(u.SessionInfo.ToSearchParams()),
+		EncodeSearchParams(params),
 	)
 
 	u.Logger.Info(fmt.Sprintf("uploader: requesting signed URL for %s -> %s", fileName, url))

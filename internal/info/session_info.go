@@ -86,7 +86,7 @@ func (d *SessionInfo) PopulateDeviceInfo() error {
 func (d *SessionInfo) getPrimaryGPU() *gpu.GraphicsCard {
 	gpu, err := ghw.GPU()
 	if err != nil {
-		d.Logger.Error(fmt.Sprintf("Error getting GPU info: %v", err))
+		d.Logger.Error(fmt.Errorf("Error getting GPU info: %w", err).Error())
 		return nil
 	}
 	return gpu.GraphicsCards[0]
