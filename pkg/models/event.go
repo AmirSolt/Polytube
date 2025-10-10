@@ -7,6 +7,7 @@ type EventType int
 const (
 	EventTypeInputLog EventType = iota
 	EventTypeConsoleLog
+	EventTypeRecordingStarted
 )
 
 func (e EventType) String() string {
@@ -15,6 +16,8 @@ func (e EventType) String() string {
 		return "INPUT_LOG"
 	case EventTypeConsoleLog:
 		return "CONSOLE_LOG"
+	case EventTypeRecordingStarted:
+		return "RECORDING_STARTED"
 	default:
 		return "UNKNOWN"
 	}

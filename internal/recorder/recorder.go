@@ -26,16 +26,19 @@ import (
 	"golang.org/x/sys/windows"
 	"golang.org/x/sys/windows/registry"
 
+	"polytube/replay/internal/events"
 	"polytube/replay/internal/logger"
+	"polytube/replay/pkg/models"
+	"polytube/replay/utils"
 )
 
 // Recorder holds configuration for launching FFmpeg and waiting for it.
 type Recorder struct {
-	Title      string         // exact window title to capture
-	DirPath    string         // directory to place HLS files
-	FFmpegPath string         // path to ffmpeg.exe
-	Logger     *logger.Logger // internal logger for diagnostic output
-
+	Title          string                 // exact window title to capture
+	DirPath        string                 // directory to place HLS files
+	FFmpegPath     string                 // path to ffmpeg.exe
+	Logger         logger.LoggerInterface // internal logger for diagnostic output
+	EventLogger    events.EventLoggerInterface
 	cmd            *exec.Cmd
 	stdioWG        sync.WaitGroup
 	manifestPath   string
@@ -185,6 +188,21 @@ func (r *Recorder) Wait() error {
 	})
 
 	return r.waitErr
+}
+
+func (r *Recorder) LogRecordingStartedEvent() error {
+	event := models.Event{
+		Timestamp:  utils.NowEpochSeconds(),
+		EventType:  models.EventTypeRecordingStarted.String(),
+		EventLevel: "",
+		Content:    "",
+		Value:      0,
+	}
+	if err := r.EventLogger.LogEvent(event); err != nil {
+		r.Logger.Warn(fmt.Sprintf("input listener: failed to log event: %v", err))
+		return err
+	}
+	return nil
 }
 
 // pipeToLogger scans a stream (stdout/stderr) line-by-line and forwards it to the internal logger.

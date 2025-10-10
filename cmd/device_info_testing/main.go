@@ -4,12 +4,23 @@ import (
 	"encoding/json"
 	"fmt"
 	"polytube/replay/internal/info"
+	"polytube/replay/internal/logger"
 )
 
 func main() {
-	inf := info.SessionInfo{}
-	inf.PopulateInfo("AppName", "AppVersion", "tag1, tag2, tag3")
-	jsonBytes, err := json.MarshalIndent(inf, "", "\t")
+	intLog := &logger.MockLogger{}
+
+	appName := "AppName"
+	appVersion := "AppVersion"
+
+	sessionInfo := info.SessionInfo{
+		AppName:    &appName,
+		AppVersion: &appVersion,
+		Tags:       info.ParseTags("tag1, tag2, tag3"),
+		Logger:     intLog,
+	}
+	sessionInfo.PopulateDeviceInfo()
+	jsonBytes, err := json.MarshalIndent(sessionInfo, "", "\t")
 	if err != nil {
 		fmt.Println("Error marshaling to JSON:", err)
 		return

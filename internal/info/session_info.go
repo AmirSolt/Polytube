@@ -4,6 +4,7 @@ package info
 
 import (
 	"fmt"
+	"polytube/replay/internal/logger"
 	"polytube/replay/pkg/models"
 	"runtime"
 	"strings"
@@ -64,24 +65,31 @@ type SessionInfo struct {
 	GPUModel   *string `json:"gpu_model" db:"gpu_model"`
 	GPUBrand   *string `json:"gpu_brand" db:"gpu_brand"`
 	OS         *string `json:"os" db:"os"`
+
+	Logger logger.LoggerInterface
 }
 
 // PopulateInfo fills in all fields it can detect locally
-func (d *SessionInfo) PopulateInfo(appName string, appVersion string, tagsStr string) error {
-	d.AppName = &appName
-	d.AppVersion = &appVersion
-	d.Tags = parseTags(tagsStr)
-
+func (d *SessionInfo) PopulateDeviceInfo() error {
 	d.Country = getCountry()
 	d.DeviceType = getDeviceType()
 	d.OS = getOSInfo()
 
-	primGpu := getPrimaryGPU()
+	primGpu := d.getPrimaryGPU()
 	if primGpu != nil {
 		d.GPUModel = getModelStr(primGpu)
 		d.GPUBrand = &primGpu.DeviceInfo.Vendor.Name
 	}
 	return nil
+}
+
+func (d *SessionInfo) getPrimaryGPU() *gpu.GraphicsCard {
+	gpu, err := ghw.GPU()
+	if err != nil {
+		d.Logger.Error(fmt.Sprintf("Error getting GPU info: %v", err))
+		return nil
+	}
+	return gpu.GraphicsCards[0]
 }
 
 func (s *SessionInfo) ToSearchParams() []models.SearchParam {
@@ -114,7 +122,7 @@ func (s *SessionInfo) ToSearchParams() []models.SearchParam {
 
 // --- Helpers ---
 
-func parseTags(tagsStr string) []string {
+func ParseTags(tagsStr string) []string {
 	var tags []string
 	for tag := range strings.SplitSeq(tagsStr, ",") {
 		tag = strings.TrimSpace(tag)
@@ -219,15 +227,6 @@ func getCountry() *string {
 
 	country := syscall.UTF16ToString(buf)
 	return &country
-}
-
-func getPrimaryGPU() *gpu.GraphicsCard {
-	gpu, err := ghw.GPU()
-	if err != nil {
-		fmt.Printf("Error getting GPU info: %v", err)
-		return nil
-	}
-	return gpu.GraphicsCards[0]
 }
 
 // getModel formats a human-readable GPU description

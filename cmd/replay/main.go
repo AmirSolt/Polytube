@@ -102,6 +102,11 @@ func main() {
 		_ = shutdown(svcs) // attempt cleanup anyway
 		os.Exit(1)
 	}
+	if err := svcs.rec.LogRecordingStartedEvent(); err != nil {
+		svcs.internalLogger.Error(fmt.Sprintf("Failed to log RECORDING_STARTED event. Have to exit.: %v", err))
+		_ = shutdown(svcs) // attempt cleanup anyway
+		os.Exit(1)
+	}
 	svcs.internalLogger.Info("FFmpeg started; waiting for process to exit...")
 	if err := svcs.rec.Wait(); err != nil {
 		svcs.internalLogger.Warn(fmt.Sprintf("FFmpeg exited with error: %v", err))
@@ -168,15 +173,21 @@ func parseFlags() *cliConfig {
 // startServices initializes loggers, recorder, uploader, and background listeners/poller.
 // It returns a service bundle with a cancellable context controlling all background work.
 func startServices(cfg *cliConfig, dataDir, internalLogPath, eventsPath string, ffmpegPath string) (*serviceBundle, error) {
-	sessionInfo := info.SessionInfo{}
-	sessionInfo.PopulateInfo(cfg.AppName, cfg.AppVersion, cfg.Tags)
-
 	// Internal logger first: everything else can log into it.
 	intLog, err := logger.NewLogger(internalLogPath)
 	if err != nil {
 		return nil, fmt.Errorf("create internal logger: %w", err)
 	}
 	intLog.Info("Internal logger initialized")
+
+	sessionInfo := info.SessionInfo{
+		AppName:    &cfg.AppName,
+		AppVersion: &cfg.AppVersion,
+		Tags:       info.ParseTags(cfg.Tags),
+		Logger:     intLog,
+	}
+	sessionInfo.PopulateDeviceInfo()
+	intLog.Info("SessionInfo Populated")
 
 	// =====================
 	// Log session ID
