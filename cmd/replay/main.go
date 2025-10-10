@@ -146,9 +146,6 @@ func parseFlags() *cliConfig {
 		if cfg.OutPath == "" {
 			missing = append(missing, "--out")
 		}
-		if cfg.OutPath == "" {
-			missing = append(missing, "--out")
-		}
 		if cfg.Title == "" {
 			missing = append(missing, "--title")
 		}
