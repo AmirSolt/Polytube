@@ -90,7 +90,7 @@ func (l *GamepadInputListener) pollJoysticks() {
 			if !ok {
 				name = fmt.Sprintf("Axis%d", i)
 			}
-			l.logEvent(models.EventLevelJoypad, name, float64(axis))
+			go l.logEvent(models.EventLevelJoypad, name, float64(axis))
 		}
 
 		// Log button states
@@ -103,7 +103,7 @@ func (l *GamepadInputListener) pollJoysticks() {
 			if !ok {
 				name = fmt.Sprintf("Button%d", i)
 			}
-			l.logEvent(models.EventLevelJoypad, name, value)
+			go l.logEvent(models.EventLevelJoypad, name, value)
 		}
 	}
 }

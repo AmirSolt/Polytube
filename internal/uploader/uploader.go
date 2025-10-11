@@ -190,7 +190,7 @@ func (u *Uploader) getSignedURL(path string) (string, error) {
 	if err != nil {
 		return "", fmt.Errorf("create GET request: %w", err)
 	}
-	req.Header.Set("Api-Key", u.ApiKey)
+	req.Header.Set("api-key", u.ApiKey)
 
 	client := u.client()
 	resp, err := client.Do(req)

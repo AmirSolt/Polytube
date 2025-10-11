@@ -36,11 +36,11 @@ func (l *MNKInputListener) Start(ctx context.Context) {
 			case w32.WM_KEYDOWN, w32.WM_SYSKEYDOWN:
 				// log.Printf("[KEY DOWN] %s vk=0x%02X sc=0x%02X flags=0x%02X",
 				// 	vkName(k.VkCode), k.VkCode, k.ScanCode, k.Flags)
-				l.logEvent(getDevice(k.VkCode), vkName(k.VkCode), 1)
+				go l.logEvent(getDevice(k.VkCode), vkName(k.VkCode), 1)
 			case w32.WM_KEYUP, w32.WM_SYSKEYUP:
 				// log.Printf("[KEY  UP ] %s vk=0x%02X sc=0x%02X flags=0x%02X",
 				// 	vkName(k.VkCode), k.VkCode, k.ScanCode, k.Flags)
-				l.logEvent(getDevice(k.VkCode), vkName(k.VkCode), 0)
+				go l.logEvent(getDevice(k.VkCode), vkName(k.VkCode), 0)
 			}
 		}
 		return w32.CallNextHookEx(0, code, wParam, lParam)
