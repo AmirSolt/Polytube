@@ -1,8 +1,8 @@
 <h1 align="center">
-  <img width="800" src="/polytube_banner.png" alt="Session Replay">
+  <img width="800" src="/polytube_banner.png" alt="Polytube">
 </h1>
 <p align="center">
-  This tool <b>records gameplay sessions</b> for playtesting and debugging. It uses <b>GPU duplication</b> for high performance and minimal impact on system resources, and can automatically upload recordings to the <b>cloud</b> when valid credentials are provided.
+  Polytube is an analytics tool that <b>records gameplay sessions</b> for playtesting and debugging. It uses <b>GPU duplication</b> for high performance and minimal impact on system resources, and can automatically upload recordings to the <b>cloud</b> when valid credentials are provided.
 </p>
 
 <h4 align="center">
