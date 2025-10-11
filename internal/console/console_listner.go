@@ -71,9 +71,7 @@ func (c *ConsoleListener) Start(ctx context.Context) {
 				Value:      0,
 			}
 
-			if err := c.EventLogger.LogEvent(event); err != nil {
-				c.Logger.Warn(fmt.Sprintf("console listener: log event failed: %v", err))
-			}
+			c.EventLogger.LogEvent(event)
 		}
 	}
 }

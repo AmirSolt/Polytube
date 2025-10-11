@@ -36,11 +36,11 @@ func (l *MNKInputListener) Start(ctx context.Context) {
 			case w32.WM_KEYDOWN, w32.WM_SYSKEYDOWN:
 				// log.Printf("[KEY DOWN] %s vk=0x%02X sc=0x%02X flags=0x%02X",
 				// 	vkName(k.VkCode), k.VkCode, k.ScanCode, k.Flags)
-				go l.logEvent(getDevice(k.VkCode), vkName(k.VkCode), 1)
+				l.logEvent(getDevice(k.VkCode), vkName(k.VkCode), 1)
 			case w32.WM_KEYUP, w32.WM_SYSKEYUP:
 				// log.Printf("[KEY  UP ] %s vk=0x%02X sc=0x%02X flags=0x%02X",
 				// 	vkName(k.VkCode), k.VkCode, k.ScanCode, k.Flags)
-				go l.logEvent(getDevice(k.VkCode), vkName(k.VkCode), 0)
+				l.logEvent(getDevice(k.VkCode), vkName(k.VkCode), 0)
 			}
 		}
 		return w32.CallNextHookEx(0, code, wParam, lParam)
@@ -61,17 +61,17 @@ func (l *MNKInputListener) Start(ctx context.Context) {
 		if code >= 0 {
 			switch wParam {
 			case w32.WM_LBUTTONDOWN:
-				go l.logEvent(models.EventLevelMouse, "VK_LBUTTON", 1)
+				l.logEvent(models.EventLevelMouse, "VK_LBUTTON", 1)
 			case w32.WM_LBUTTONUP:
-				go l.logEvent(models.EventLevelMouse, "VK_LBUTTON", 0)
+				l.logEvent(models.EventLevelMouse, "VK_LBUTTON", 0)
 			case w32.WM_RBUTTONDOWN:
-				go l.logEvent(models.EventLevelMouse, "VK_RBUTTON", 1)
+				l.logEvent(models.EventLevelMouse, "VK_RBUTTON", 1)
 			case w32.WM_RBUTTONUP:
-				go l.logEvent(models.EventLevelMouse, "VK_RBUTTON", 0)
+				l.logEvent(models.EventLevelMouse, "VK_RBUTTON", 0)
 			case w32.WM_MBUTTONDOWN:
-				go l.logEvent(models.EventLevelMouse, "VK_MBUTTON", 1)
+				l.logEvent(models.EventLevelMouse, "VK_MBUTTON", 1)
 			case w32.WM_MBUTTONUP:
-				go l.logEvent(models.EventLevelMouse, "VK_MBUTTON", 0)
+				l.logEvent(models.EventLevelMouse, "VK_MBUTTON", 0)
 				// Skip all others: move, wheel, xbuttons, etc.
 			}
 		}
@@ -130,9 +130,7 @@ func (l *MNKInputListener) logEvent(level models.EventLevel, key string, value f
 		Content:    key,
 		Value:      value,
 	}
-	if err := l.EventLogger.LogEvent(event); err != nil {
-		l.Logger.Warn(fmt.Sprintf("input listener: failed to log event: %v", err))
-	}
+	l.EventLogger.LogEvent(event)
 }
 
 var VKKbNames = map[uint32]string{

@@ -7,9 +7,8 @@ import (
 
 type MockEventLogger struct{}
 
-func (l *MockEventLogger) LogEvent(e models.Event) error {
+func (l *MockEventLogger) LogEvent(e models.Event) {
 	fmt.Printf("[EVENT] %+v\n", e)
-	return nil
 }
 
 func (l *MockEventLogger) Close() error {

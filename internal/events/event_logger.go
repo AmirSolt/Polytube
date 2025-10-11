@@ -2,26 +2,32 @@ package events
 
 import (
 	"fmt"
-	"sync"
+	"time"
 
 	"polytube/replay/pkg/models"
 
 	"github.com/xitongsys/parquet-go-source/local"
 	"github.com/xitongsys/parquet-go/parquet"
+	"github.com/xitongsys/parquet-go/source"
 	"github.com/xitongsys/parquet-go/writer"
 )
 
+// EventLoggerInterface defines a basic event logger
 type EventLoggerInterface interface {
-	LogEvent(e models.Event) error
+	LogEvent(e models.Event)
 	Close() error
 }
 
+// ParquetEventLogger uses a background goroutine and channel for non-blocking logging
 type ParquetEventLogger struct {
-	mu     sync.Mutex
 	writer *writer.ParquetWriter
+	file   source.ParquetFile
+
+	ch   chan models.Event
+	done chan struct{}
 }
 
-// Create new parquet file writer
+// NewParquetEventLogger creates a new buffered parquet event logger
 func NewParquetEventLogger(path string) (*ParquetEventLogger, error) {
 	fw, err := local.NewLocalFileWriter(path)
 	if err != nil {
@@ -30,6 +36,7 @@ func NewParquetEventLogger(path string) (*ParquetEventLogger, error) {
 
 	pw, err := writer.NewParquetWriter(fw, new(models.Event), 4)
 	if err != nil {
+		_ = fw.Close()
 		return nil, fmt.Errorf("create parquet writer: %w", err)
 	}
 
@@ -37,43 +44,58 @@ func NewParquetEventLogger(path string) (*ParquetEventLogger, error) {
 	pw.RowGroupSize = 128 * 1024 * 1024 // 128MB
 	pw.PageSize = 8 * 1024              // 8KB
 
-	return &ParquetEventLogger{writer: pw}, nil
+	l := &ParquetEventLogger{
+		writer: pw,
+		file:   fw,
+		ch:     make(chan models.Event, 4096), // channel buffer size
+		done:   make(chan struct{}),
+	}
+
+	go l.loop()
+	return l, nil
 }
 
-func (l *ParquetEventLogger) LogEvent(e models.Event) error {
-	l.mu.Lock()
-	defer l.mu.Unlock()
+// loop continuously writes events to the parquet writer and flushes periodically
+func (l *ParquetEventLogger) loop() {
+	ticker := time.NewTicker(time.Second)
+	defer ticker.Stop()
 
-	row := models.Event{
-		Timestamp:  e.Timestamp,
-		EventType:  e.EventType,
-		EventLevel: e.EventLevel,
-		Content:    e.Content,
-		Value:      e.Value,
+	for {
+		select {
+		case e := <-l.ch:
+			_ = l.writer.Write(e) // best-effort write, errors can be logged if needed
+
+		case <-ticker.C:
+			_ = l.writer.Flush(true)
+
+		case <-l.done:
+			// drain remaining events
+			for {
+				select {
+				case e := <-l.ch:
+					_ = l.writer.Write(e)
+				default:
+					_ = l.writer.Flush(true)
+					_ = l.writer.WriteStop()
+					_ = l.file.Close()
+					return
+				}
+			}
+		}
 	}
-	if err := l.writer.Write(row); err != nil {
-		return fmt.Errorf("parquet write: %w", err)
-	}
-	return nil
 }
 
-// Close flushes and finalizes the file
+// LogEvent enqueues an event non-blockingly
+func (l *ParquetEventLogger) LogEvent(e models.Event) {
+	select {
+	case l.ch <- e:
+	default:
+		// channel full: drop event to avoid blocking
+	}
+}
+
+// Close signals the writer goroutine to stop and flush remaining events
 func (l *ParquetEventLogger) Close() error {
-	l.mu.Lock()
-	defer l.mu.Unlock()
-
-	if l.writer == nil {
-		return nil
-	}
-
-	if err := l.writer.WriteStop(); err != nil {
-		return fmt.Errorf("close parquet writer: %w", err)
-	}
-
-	if err := l.writer.PFile.Close(); err != nil {
-		return fmt.Errorf("close parquet file: %w", err)
-	}
-
-	l.writer = nil
+	close(l.done)
 	return nil
 }

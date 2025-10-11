@@ -198,10 +198,7 @@ func (r *Recorder) LogRecordingStartedEvent() error {
 		Content:    "",
 		Value:      0,
 	}
-	if err := r.EventLogger.LogEvent(event); err != nil {
-		r.Logger.Warn(fmt.Sprintf("input listener: failed to log event: %v", err))
-		return err
-	}
+	r.EventLogger.LogEvent(event)
 	return nil
 }
 

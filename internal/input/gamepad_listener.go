@@ -51,10 +51,6 @@ func (l *GamepadInputListener) Start(ctx context.Context) {
 	}
 	window.MakeContextCurrent()
 
-	// Sticky input ensures no missed presses
-	window.SetInputMode(glfw.StickyKeysMode, glfw.True)
-	window.SetInputMode(glfw.StickyMouseButtonsMode, glfw.True)
-
 	l.Logger.Info("GLFW input callbacks installed")
 
 	ticker := time.NewTicker(POLL_INTERVAL_MS * time.Millisecond)
@@ -90,7 +86,7 @@ func (l *GamepadInputListener) pollJoysticks() {
 			if !ok {
 				name = fmt.Sprintf("Axis%d", i)
 			}
-			go l.logEvent(models.EventLevelJoypad, name, float64(axis))
+			l.logEvent(models.EventLevelJoypad, name, float64(axis))
 		}
 
 		// Log button states
@@ -103,7 +99,7 @@ func (l *GamepadInputListener) pollJoysticks() {
 			if !ok {
 				name = fmt.Sprintf("Button%d", i)
 			}
-			go l.logEvent(models.EventLevelJoypad, name, value)
+			l.logEvent(models.EventLevelJoypad, name, value)
 		}
 	}
 }
@@ -136,9 +132,7 @@ func (l *GamepadInputListener) logEvent(level models.EventLevel, key string, val
 		Content:    key,
 		Value:      value,
 	}
-	if err := l.EventLogger.LogEvent(event); err != nil {
-		l.Logger.Warn(fmt.Sprintf("input listener: failed to log event: %v", err))
-	}
+	l.EventLogger.LogEvent(event)
 }
 
 var AxisNames = map[int]string{
