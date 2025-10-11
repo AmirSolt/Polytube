@@ -59,25 +59,23 @@ func (l *MNKInputListener) Start(ctx context.Context) {
 	// --- Mouse hook (int32 in the signature!) ---
 	msProc := w32.NewHookProcedure(func(code int32, wParam, lParam uintptr) uintptr {
 		if code >= 0 {
-			// m := (*w32.MSLLHOOKSTRUCT)(unsafe.Pointer(lParam)) // #nosec G103 safe Windows callback cast
 			switch wParam {
 			case w32.WM_LBUTTONDOWN:
-				l.logEvent(models.EventLevelMouse, vkName(w32.WM_LBUTTONDOWN), 1)
+				go l.logEvent(models.EventLevelMouse, "VK_LBUTTON", 1)
 			case w32.WM_LBUTTONUP:
-				l.logEvent(models.EventLevelMouse, vkName(w32.WM_LBUTTONUP), 0)
+				go l.logEvent(models.EventLevelMouse, "VK_LBUTTON", 0)
 			case w32.WM_RBUTTONDOWN:
-				l.logEvent(models.EventLevelMouse, vkName(w32.WM_RBUTTONDOWN), 1)
+				go l.logEvent(models.EventLevelMouse, "VK_RBUTTON", 1)
 			case w32.WM_RBUTTONUP:
-				l.logEvent(models.EventLevelMouse, vkName(w32.WM_RBUTTONUP), 0)
+				go l.logEvent(models.EventLevelMouse, "VK_RBUTTON", 0)
 			case w32.WM_MBUTTONDOWN:
-				l.logEvent(models.EventLevelMouse, vkName(w32.WM_MBUTTONDOWN), 1)
+				go l.logEvent(models.EventLevelMouse, "VK_MBUTTON", 1)
 			case w32.WM_MBUTTONUP:
-				l.logEvent(models.EventLevelMouse, vkName(w32.WM_MBUTTONUP), 0)
-				// case w32.WM_MOUSEWHEEL:
-				// delta := int16((m.MouseData >> 16) & 0xFFFF)
-				// log.Printf("[MOUSE] WHEEL %+d x=%d y=%d", delta, m.Pt.X, m.Pt.Y)
+				go l.logEvent(models.EventLevelMouse, "VK_MBUTTON", 0)
+				// Skip all others: move, wheel, xbuttons, etc.
 			}
 		}
+		// Return immediately to avoid blocking cursor movement
 		return w32.CallNextHookEx(0, code, wParam, lParam)
 	})
 	msHook, err := w32.SetWindowsHookEx(w32.WH_MOUSE_LL, msProc, hInst, 0)

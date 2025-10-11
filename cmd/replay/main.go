@@ -194,7 +194,7 @@ func startServices(cfg *cliConfig, dataDir, internalLogPath, eventsPath string, 
 
 	// =====================
 	// Log session ID
-	intLog.Info(fmt.Sprintf("Session ID: %s", cfg.SessionID))
+	intLog.Info(fmt.Sprintf("Session ID: %+v", cfg))
 
 	// Structured event logger (ndjson).
 	evLog, err := events.NewParquetEventLogger(eventsPath)
