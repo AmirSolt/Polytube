@@ -127,7 +127,7 @@ func (s *SessionInfo) ToSearchParams() []models.SearchParam {
 
 func ParseTags(tagsStr string) []string {
 	var tags []string
-	for tag := range strings.SplitSeq(tagsStr, ",") {
+	for _, tag := range strings.Split(tagsStr, ",") {
 		tag = strings.TrimSpace(tag)
 		if tag != "" {
 			tags = append(tags, tag)
