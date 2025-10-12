@@ -7,7 +7,7 @@
 
 <h4 align="center">
   <a href="https://polytube.io/">Polytube Cloud Storage</a> |
-  <a href="https://assetstore.unity.com/packages/slug/338050">Unity Polytube Package</a>
+  <a href="https://github.com/AmirSolt/Unity-Polytube">Unity Polytube Package</a>
 </h4>
 
 <p align="center">
