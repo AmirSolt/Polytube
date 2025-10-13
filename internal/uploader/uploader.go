@@ -163,16 +163,15 @@ func (u *Uploader) uploadFile(path string) {
 // getSignedURL sends a GET request to retrieve a signed URL for uploading the given file.
 func (u *Uploader) getSignedURL(path string) (string, error) {
 	fileName := filepath.Base(path)
-	sizeMB, err := utils.GetFileSizeMB(path)
+	contentLength, err := utils.GetFileContentLength(path)
 	if err != nil {
-		u.Logger.Error(fmt.Errorf("could not get : %w", err).Error())
-		sizeMB = 0
+		return "", err
 	}
 
 	params := u.SessionInfo.ToSearchParams()
 	params = append(params, models.SearchParam{
-		Key:   "size_mb",
-		Value: fmt.Sprintf("%.2f", sizeMB),
+		Key:   "content_length",
+		Value: fmt.Sprintf("%d", contentLength),
 	})
 
 	url := fmt.Sprintf("%s/%s/%s/%s/%s?%s",
