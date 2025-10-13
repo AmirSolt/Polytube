@@ -133,7 +133,7 @@ func parseFlags() *cliConfig {
 	flag.BoolVar(&cfg.IsLoading, "load", false, "Loads nessesary binaries (ffmpeg) and exits. Ignores other flags.")
 	flag.StringVar(&cfg.Title, "title", "", "Window title to record (exact match, use quotes if needed).")
 	flag.StringVar(&cfg.OutPath, "out", "", "Directory where output files (video, logs, etc.) will be saved.")
-	flag.StringVar(&cfg.Endpoint, "endpoint", "https://polytube.io/api/sign", "Upload endpoint URL for cloud storage.")
+	flag.StringVar(&cfg.Endpoint, "endpoint", "https://polytube.io", "Upload endpoint URL for cloud storage.")
 	flag.StringVar(&cfg.ApiID, "api-id", "", "API ID for authentication when communicating with the upload endpoint.")
 	flag.StringVar(&cfg.ApiKey, "api-key", "", "API Key for authentication when communicating with the upload endpoint.")
 	flag.StringVar(&cfg.SessionID, "session-id", "", "*Leave Empty* Unique session identifier (UUID). Used to link uploads to an existing session on the server. Auto generated.")
@@ -190,7 +190,7 @@ func startServices(cfg *cliConfig, dataDir, internalLogPath, eventsPath string, 
 		Logger:     intLog,
 	}
 	sessionInfo.PopulateDeviceInfo()
-	intLog.Info("SessionInfo Populated")
+	intLog.Info(fmt.Sprintf("SessionInfo Populated: %+v", sessionInfo))
 
 	// =====================
 	// Log session ID

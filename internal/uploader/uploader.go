@@ -17,6 +17,8 @@
 package uploader
 
 import (
+	"bytes"
+	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
@@ -146,6 +148,11 @@ func (u *Uploader) uploadFile(path string) {
 
 	fileName := filepath.Base(path)
 
+	if err := u.createSession(fileName); err != nil {
+		u.Logger.Error(fmt.Errorf("uploader: failed to create session %s: %w", fileName, err).Error())
+		return
+	}
+
 	signedURL, err := u.getSignedURL(path)
 	if err != nil {
 		u.Logger.Error(fmt.Errorf("uploader: failed to get signed URL for %s: %w", fileName, err).Error())
@@ -160,6 +167,44 @@ func (u *Uploader) uploadFile(path string) {
 	u.markUploaded(path)
 }
 
+func (u *Uploader) createSession(filename string) error {
+	url := fmt.Sprintf("%s/api/sign/%s/%s",
+		strings.TrimSuffix(u.EndpointURL, "/"),
+		u.ApiID,     // maps to params.user_id
+		u.SessionID, // maps to params.session_id
+	)
+
+	u.Logger.Info(fmt.Sprintf("uploader: creating session for %s -> %s", filename, url))
+
+	// u.SessionInfo to json
+	sessionJSON, err := json.Marshal(u.SessionInfo)
+	if err != nil {
+		return fmt.Errorf("marshal SessionInfo: %w", err)
+	}
+
+	req, err := http.NewRequest(http.MethodPost, url, bytes.NewReader(sessionJSON))
+	if err != nil {
+		return fmt.Errorf("create POST request: %w", err)
+	}
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("api-key", u.ApiKey)
+
+	client := u.client()
+	resp, err := client.Do(req)
+	if err != nil {
+		return fmt.Errorf("POST request failed: %w", err)
+	}
+	defer resp.Body.Close()
+
+	body, _ := io.ReadAll(resp.Body)
+	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		return fmt.Errorf("server returned %d: %s", resp.StatusCode, string(body))
+	}
+
+	u.Logger.Info(fmt.Sprintf("uploader: session created successfully for %s", filename))
+	return nil
+}
+
 // getSignedURL sends a GET request to retrieve a signed URL for uploading the given file.
 func (u *Uploader) getSignedURL(path string) (string, error) {
 	fileName := filepath.Base(path)
@@ -168,11 +213,10 @@ func (u *Uploader) getSignedURL(path string) (string, error) {
 		return "", err
 	}
 
-	params := u.SessionInfo.ToSearchParams()
-	params = append(params, models.SearchParam{
+	params := []models.SearchParam{models.SearchParam{
 		Key:   "content_length",
 		Value: fmt.Sprintf("%d", contentLength),
-	})
+	}}
 
 	url := fmt.Sprintf("%s/%s/%s/%s/%s?%s",
 		strings.TrimSuffix(u.EndpointURL, "/"),
