@@ -168,7 +168,7 @@ func (u *Uploader) uploadFile(path string) {
 }
 
 func (u *Uploader) createSession(filename string) error {
-	url := fmt.Sprintf("%s/api/sign/%s/%s",
+	url := fmt.Sprintf("%s/api/session/%s/%s",
 		strings.TrimSuffix(u.EndpointURL, "/"),
 		u.ApiID,     // maps to params.user_id
 		u.SessionID, // maps to params.session_id
@@ -218,7 +218,7 @@ func (u *Uploader) getSignedURL(path string) (string, error) {
 		Value: fmt.Sprintf("%d", contentLength),
 	}}
 
-	url := fmt.Sprintf("%s/%s/%s/%s/%s?%s",
+	url := fmt.Sprintf("%s/api/sign/%s/%s/%s/%s?%s",
 		strings.TrimSuffix(u.EndpointURL, "/"),
 		u.ApiID,     // maps to params.user_id
 		u.SessionID, // maps to params.session_id
