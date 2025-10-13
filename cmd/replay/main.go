@@ -268,6 +268,10 @@ func startServices(cfg *cliConfig, dataDir, internalLogPath, eventsPath string, 
 	go func(poll int) {
 		intLog.Info(fmt.Sprintf("Uploader poller starting (interval=%ds)", poll))
 		ticker := time.NewTicker(time.Duration(poll) * time.Second)
+		if url, err := upl.CreateSession(); err != nil {
+			upl.Logger.Error(fmt.Errorf("uploader: failed to create session at %s: %w", url, err).Error())
+			return
+		}
 		defer ticker.Stop()
 		for {
 			select {
