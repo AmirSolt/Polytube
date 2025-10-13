@@ -43,7 +43,7 @@ Loads all necessary binaries (such as `ffmpeg`) into the local cache and then ex
   **Example:**
 
 ```bash
-recorder.exe --load
+polytube.exe --load
 ```
 
 ---
@@ -59,7 +59,7 @@ Specifies the exact title of the window to record.
   **Example:**
 
 ```bash
-recorder.exe --title "My Game Window"
+polytube.exe --title "My Game Window"
 ```
 
 ---
@@ -71,7 +71,7 @@ Defines the output directory where the generated files (e.g., video segments, pl
 **Example:**
 
 ```bash
-recorder.exe --out "C:\Recordings\MySession"
+polytube.exe --out "C:\Recordings\MySession"
 ```
 
 ---
@@ -88,7 +88,7 @@ Specifies the upload endpoint for cloud storage.
 **Example:**
 
 ```bash
-recorder.exe --endpoint "https://api.mydomain.com/upload"
+polytube.exe --endpoint "https://api.mydomain.com/upload"
 ```
 
 ---
@@ -102,7 +102,7 @@ Sets the API ID used for authentication when communicating with the upload endpo
 **Example:**
 
 ```bash
-recorder.exe --api-id "user_12345"
+polytube.exe --api-id "user_12345"
 ```
 
 ---
@@ -116,7 +116,7 @@ Sets the API key used for authentication with the upload endpoint.
 **Example:**
 
 ```bash
-recorder.exe --api-key "secretkey123"
+polytube.exe --api-key "secretkey123"
 ```
 
 ---
@@ -131,7 +131,7 @@ Provides the unique session identifier used to associate uploaded data with an e
 **Example:**
 
 ```bash
-recorder.exe --session-id "d7a52e64-87d1-4a3a-9f83-2c582b6f4e7f"
+polytube.exe --session-id "d7a52e64-87d1-4a3a-9f83-2c582b6f4e7f"
 ```
 
 ---
@@ -145,7 +145,7 @@ Tags help organize and categorize sessions on the dashboard.
 **Example:**
 
 ```bash
-recorder.exe --tags "debug,build42,test"
+polytube.exe --tags "debug,build42,test"
 ```
 
 ---
@@ -159,7 +159,7 @@ Sets the name of the application or game being recorded.
 **Example:**
 
 ```bash
-recorder.exe --app-name "MyCoolGame"
+polytube.exe --app-name "MyCoolGame"
 ```
 
 ---
@@ -175,7 +175,7 @@ Use [semantic versioning](https://semver.org/) format, e.g. `1.0.0`.
 **Example:**
 
 ```bash
-recorder.exe --app-version "1.3.2"
+polytube.exe --app-version "1.3.2"
 ```
 
 ---
@@ -189,7 +189,7 @@ Sets how often (in seconds) the uploader checks for new files to upload.
 **Example:**
 
 ```bash
-recorder.exe --poll 10
+polytube.exe --poll 10
 ```
 
 ---
@@ -197,7 +197,7 @@ recorder.exe --poll 10
 **Tip:** Combine arguments as needed:
 
 ```bash
-recorder.exe --title "My Game" --out "C:\Recordings" --tags "test,build42" --app-name "MyGame" --app-version "1.0.0"
+polytube.exe --title "My Game" --out "C:\Recordings" --tags "test,build42" --app-name "MyGame" --app-version "1.0.0"
 ```
 
 
