@@ -20,10 +20,6 @@
 
 ## Notes
 
-### Do not close the program manually
-
-The recorder is designed to shut down automatically when the target window closes. Do not kill the process abruptly.
-
 ### Proper Consent Forms
 
 Make sure you comply with privacy laws in every region where your software will be released. If your application uses cloud storage and doesn't meet these regulations, it could be banned or restricted.
