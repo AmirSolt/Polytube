@@ -105,7 +105,7 @@ func main() {
 
 	// Log event
 	if err := svcs.rec.LogRecordingStartedEvent(); err != nil {
-		svcs.internalLogger.Error(fmt.Errorf("Failed to log RECORDING_STARTED event. Have to exit.: %w", err).Error())
+		svcs.internalLogger.Error(fmt.Errorf("failed to log RECORDING_STARTED event. Have to exit.: %w", err).Error())
 		_ = shutdown(svcs) // attempt cleanup anyway
 		os.Exit(1)
 	}
