@@ -196,6 +196,21 @@ polytube.exe --engine "Unity 6.*.*"
 
 ---
 
+### `--meta-data "<Json format>"`
+
+**Description:**
+This flag is used by the wrapper. Setting this flag might break the software.
+An alternative way to pass data without breaking older versions. Uses Json format. 
+**Default:**
+`{}`
+**Example:**
+
+```bash
+polytube.exe --meta-data "{...}"
+```
+
+---
+
 ### `--poll <seconds>`
 
 **Description:**

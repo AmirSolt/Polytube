@@ -45,6 +45,7 @@ type cliConfig struct {
 	AppName     string
 	AppVersion  string
 	Engine      string
+	Metadata    string
 }
 
 // serviceBundle groups all running components so main can manage their lifecycle.
@@ -142,6 +143,7 @@ func parseFlags() *cliConfig {
 	flag.StringVar(&cfg.AppName, "app-name", "<Unassigned>", "Name of the app or game being recorded. Appears in analytics and upload metadata.")
 	flag.StringVar(&cfg.AppVersion, "app-version", "<Unassigned>", "Version of the app being recorded. Use semantic versioning (e.g., '1.0.0').")
 	flag.StringVar(&cfg.Engine, "engine", "<Unassigned>", "What game engine is primarily used to make this game.")
+	flag.StringVar(&cfg.Metadata, "meta-data", "{}", "An alternative way to pass data without breaking older versions. Uses Json format.")
 	flag.IntVar(&cfg.PollSeconds, "poll", defaultPollSeconds, fmt.Sprintf("Interval in seconds between uploader checks for new files to upload. Default: %d", defaultPollSeconds))
 	flag.Parse()
 
