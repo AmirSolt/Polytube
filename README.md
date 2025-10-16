@@ -182,6 +182,20 @@ polytube.exe --app-version "1.3.2"
 
 ---
 
+### `--engine "<Engine version>"`
+
+**Description:**
+Specifies the engine used to make the game. Including the version is optional. It's not viewable in the dashboard.
+**Default:**
+`<Unassigned>`
+**Example:**
+
+```bash
+polytube.exe --engine "Unity 6.*.*"
+```
+
+---
+
 ### `--poll <seconds>`
 
 **Description:**
