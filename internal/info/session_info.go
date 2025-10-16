@@ -67,15 +67,17 @@ type SessionInfo struct {
 	GPUVendor  *string `json:"gpu_vendor" db:"gpu_vendor"`
 	OS         *string `json:"os" db:"os"`
 
+	Engine *string `json:"engine" db:"engine"`
+
 	Logger logger.LoggerInterface
 }
 
 // PopulateInfo fills in all fields it can detect locally
-func (d *SessionInfo) PopulateDeviceInfo() error {
+func (d *SessionInfo) PopulateDeviceInfo(engine string) error {
 	d.Country = getCountry()
 	d.DeviceType = getDeviceType()
 	d.OS = getOSInfo()
-
+	d.Engine = &engine
 	primGpu := d.getPrimaryGPU()
 	if primGpu != nil {
 		d.GPUModel = &primGpu.DeviceInfo.Product.Name

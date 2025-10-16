@@ -51,6 +51,27 @@ type Uploader struct {
 	SessionInfo         info.SessionInfo
 }
 
+type PatchSessionParams struct {
+	Ends bool `json:"ends" db:"ends"`
+}
+
+func (u *Uploader) StartSessionInfo() {
+	if url, err := u.CreateSession(); err != nil {
+		u.Logger.Error(fmt.Errorf("uploader: failed to create session at %s: %w", url, err).Error())
+		return
+	}
+}
+
+func (u *Uploader) EndSessionInfo() {
+	params := PatchSessionParams{
+		Ends: true,
+	}
+	if url, err := u.PatchSessionEnd(params); err != nil {
+		u.Logger.Error(fmt.Errorf("uploader: failed to patch session at %s: %w", url, err).Error())
+		return
+	}
+}
+
 // UploadTS scans DirPath for .ts files and uploads any that aren't yet uploaded.
 // It skips files still being written by checking last-modified timestamps
 // (simple heuristic: older than ~2s).
@@ -163,9 +184,15 @@ func (u *Uploader) uploadFile(path string) {
 }
 
 func (u *Uploader) CreateSession() (string, error) {
+
+	apiId := u.ApiID
+	if apiId == "" {
+		apiId = "anon"
+	}
+
 	url := fmt.Sprintf("%s/api/session/%s/%s",
 		strings.TrimSuffix(u.EndpointURL, "/"),
-		u.ApiID,     // maps to params.user_id
+		apiId,       // maps to params.user_id
 		u.SessionID, // maps to params.session_id
 	)
 
@@ -198,6 +225,53 @@ func (u *Uploader) CreateSession() (string, error) {
 	}
 
 	u.Logger.Info(fmt.Sprintf("Uploader: session created successfully at %s", url))
+	return url, nil
+}
+
+func (u *Uploader) PatchSessionEnd(params PatchSessionParams) (string, error) {
+	apiId := u.ApiID
+	if apiId == "" {
+		apiId = "anon"
+	}
+
+	url := fmt.Sprintf("%s/api/session/%s/%s",
+		strings.TrimSuffix(u.EndpointURL, "/"),
+		apiId,
+		u.SessionID,
+	)
+
+	u.Logger.Info(fmt.Sprintf("Uploader: Sending PATCH to %s (params=%+v)", url, params))
+
+	jsonBody, err := json.Marshal(params)
+	if err != nil {
+		u.Logger.Error(fmt.Sprintf("Uploader: failed to marshal JSON body: %v", err))
+		return url, fmt.Errorf("marshal JSON: %w", err)
+	}
+	u.Logger.Info(fmt.Sprintf("Uploader: PATCH request body: %s", string(jsonBody)))
+
+	req, err := http.NewRequest(http.MethodPatch, url, bytes.NewReader(jsonBody))
+	if err != nil {
+		u.Logger.Error(fmt.Sprintf("Uploader: failed to create PATCH request: %v", err))
+		return url, fmt.Errorf("create PATCH request: %w", err)
+	}
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("api-key", u.ApiKey)
+
+	client := u.client()
+	resp, err := client.Do(req)
+	if err != nil {
+		u.Logger.Error(fmt.Sprintf("Uploader: PATCH request failed: %v", err))
+		return url, fmt.Errorf("PATCH request failed: %w", err)
+	}
+	defer resp.Body.Close()
+
+	respBody, _ := io.ReadAll(resp.Body)
+	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		u.Logger.Error(fmt.Sprintf("Uploader: server returned %d: %s", resp.StatusCode, string(respBody)))
+		return url, fmt.Errorf("server returned %d: %s", resp.StatusCode, string(respBody))
+	}
+
+	u.Logger.Info(fmt.Sprintf("Uploader: PATCH succeeded (%d) for %s", resp.StatusCode, url))
 	return url, nil
 }
 

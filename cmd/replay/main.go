@@ -44,6 +44,7 @@ type cliConfig struct {
 	Tags        string
 	AppName     string
 	AppVersion  string
+	Engine      string
 }
 
 // serviceBundle groups all running components so main can manage their lifecycle.
@@ -140,6 +141,7 @@ func parseFlags() *cliConfig {
 	flag.StringVar(&cfg.Tags, "tags", "", "Comma-separated list of tags for organizing or categorizing the recording session (e.g., 'test,debug,build42').")
 	flag.StringVar(&cfg.AppName, "app-name", "<Unassigned>", "Name of the app or game being recorded. Appears in analytics and upload metadata.")
 	flag.StringVar(&cfg.AppVersion, "app-version", "<Unassigned>", "Version of the app being recorded. Use semantic versioning (e.g., '1.0.0').")
+	flag.StringVar(&cfg.Engine, "engine", "<Unassigned>", "What game engine is primarily used to make this game.")
 	flag.IntVar(&cfg.PollSeconds, "poll", defaultPollSeconds, fmt.Sprintf("Interval in seconds between uploader checks for new files to upload. Default: %d", defaultPollSeconds))
 	flag.Parse()
 
@@ -189,7 +191,7 @@ func startServices(cfg *cliConfig, dataDir, internalLogPath, eventsPath string, 
 		Tags:       info.ParseTags(cfg.Tags),
 		Logger:     intLog,
 	}
-	sessionInfo.PopulateDeviceInfo()
+	sessionInfo.PopulateDeviceInfo(cfg.Engine)
 	intLog.Info(fmt.Sprintf("SessionInfo Populated: %+v", sessionInfo))
 
 	// =====================
@@ -268,10 +270,10 @@ func startServices(cfg *cliConfig, dataDir, internalLogPath, eventsPath string, 
 	go func(poll int) {
 		intLog.Info(fmt.Sprintf("Uploader poller starting (interval=%ds)", poll))
 		ticker := time.NewTicker(time.Duration(poll) * time.Second)
-		if url, err := upl.CreateSession(); err != nil {
-			upl.Logger.Error(fmt.Errorf("uploader: failed to create session at %s: %w", url, err).Error())
-			return
-		}
+
+		intLog.Info("Starting session info...")
+		upl.StartSessionInfo()
+
 		defer ticker.Stop()
 		for {
 			select {
@@ -328,6 +330,9 @@ func shutdown(svcs *serviceBundle) error {
 
 	// 3) upload all remaining non-log files
 	if svcs.upl != nil {
+		svcs.internalLogger.Info("Ending session info...")
+		svcs.upl.EndSessionInfo()
+
 		svcs.internalLogger.Info("Uploading remaining non-log files...")
 		svcs.upl.UploadRemaining()
 		// Wait for all non-log uploads to finish

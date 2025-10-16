@@ -19,7 +19,7 @@ func main() {
 		Tags:       info.ParseTags("tag1, tag2, tag3"),
 		Logger:     intLog,
 	}
-	sessionInfo.PopulateDeviceInfo()
+	sessionInfo.PopulateDeviceInfo("TEST ENGINE")
 	jsonBytes, err := json.MarshalIndent(sessionInfo, "", "\t")
 	if err != nil {
 		fmt.Println("Error marshaling to JSON:", err)
