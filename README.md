@@ -17,10 +17,12 @@
 
 
 ---
+## ❗Licenses
 
-> ## ❗License
-This work is licensed under a [Creative Commons Attribution-NoDerivatives 4.0 International License](https://creativecommons.org/licenses/by-nd/4.0/).
+>This work is licensed under a [Creative Commons Attribution-NoDerivatives 4.0 International License](https://creativecommons.org/licenses/by-nd/4.0/).
 It is free to use and redistribute for commercial use, but modification or redistribution of modified versions is not permitted.
+
+> This software uses FFmpeg (https://ffmpeg.org) licensed under the GPLv3.
 
 ---
 
